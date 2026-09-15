@@ -1,0 +1,17 @@
+# R
+.Rhistory
+.Rdata
+.Rproj.user/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+
+# Logs and Temp Files
+*.log
+*.tmp
+~$*
