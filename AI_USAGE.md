@@ -111,3 +111,166 @@ So concretely:
 **Important: nothing about the original sequences themselves changed.** No bases were edited, deleted, or guessed at. Alignment doesn't fill in missing data — it just tells you *where* the missing data is relative to everything else, by padding with gaps so every sequence occupies the same coordinate system. Your original `mammoth_mitogenomes.fasta` file is completely untouched; `mammoth_aligned.fasta` is a new, separate file sitting alongside it.
 
 - **Verification:** I successfully ran the MAFFT alignment and produced the FASTA as well as successfully verified the output in R. 
+
+## Entry 4
+- **Tool:** Claude (Sonnet 5)
+- **What I was doing:** Choosing a model substitution.
+- **What I asked (verbatim):** "Can you help me write a script using ape and phangorn in R that tests substitution models for my dataset? 
+- **Exact output (verbatim):**
+One addition worth noting: I added a `saveRDS(mt, "model_test_results.rds")` line that wasn't in the original walkthrough — since `modelTest()` can take several minutes, this saves the result to disk so you (or anyone reproducing the project) never has to rerun that slow step just to look at the output again. You can reload it anytime with `mt <- readRDS("model_test_results.rds")`.
+
+```r
+# =============================================================
+# Part 3, Step A: Substitution Model Testing
+# Mammoth mitogenome project — PUBH 6860
+# =============================================================
+# Goal: before building a phylogenetic tree, figure out which
+# substitution model best describes how these 42 mitogenomes
+# actually evolved — rather than assuming or guessing one.
+ 
+# ---- 1. Install required packages (one-time only) ----
+# ape handles general phylogenetics file formats and tree objects.
+# phangorn is the package that does model testing and tree-building.
+install.packages(c("ape", "phangorn"))
+ 
+# ---- 2. Load the alignment into phangorn's format ----
+library(phangorn)
+ 
+# phangorn has its own data structure (phyDat), separate from the
+# seqinr alignment object used in Part 2 — but it can read the
+# aligned FASTA file directly, so no manual conversion is needed.
+mammoth_phydat <- read.phyDat("mammoth_aligned.fasta",
+                               format = "fasta",
+                               type = "DNA")
+ 
+# Sanity check: should print 42 — confirms every sequence came
+# through the conversion.
+length(mammoth_phydat)
+ 
+# ---- 3. Run model testing ----
+# This fits a whole series of candidate substitution models to the
+# alignment — from the simplest (every mutation equally likely) up
+# through more realistic ones (unequal base frequencies,
+# transition/transversion bias, rate variation across sites) — and
+# scores how well each one explains the data.
+#
+# NOTE: with 42 sequences at ~16,900 bp each, this can take several
+# minutes to finish. That's expected, not a sign anything's wrong.
+mt <- modelTest(mammoth_phydat)
+ 
+# Save the results to disk so this slow step never has to be rerun
+# just to look at the output again later.
+saveRDS(mt, "model_test_results.rds")
+ 
+# ---- 4. Identify the best-fitting model ----
+# Sort by AIC: a statistic that rewards good fit but penalizes
+# unnecessary complexity — lower AIC is better. The top row is the
+# model we'll carry into Step B (building the tree).
+mt[order(mt$AIC), ]
+``` 
+Run this top to bottom in your R console, and paste the sorted AIC table here once it finishes.
+- **Verification:** Typed out the script myself, verified the output, inspected the results manually, researched the meaining of the output of the tests of both AIC (and subversions), the winning model of HKY+G(4)+I, and BIC and came to a logical conclusion of what model I would pick.
+
+## Entry 5
+- **Tool:** Claude (Sonnet 5)
+- **What I was doing:** From the model selection of HKY+G(4)+I, building a phylogeny tree.
+- **What I asked (verbatim):** "Based off the results from the substitution model selection, I am going to choose HKY+G(4)+I, AIC and AICc's winning model. Mitochondrial DNA has rate variation and I would not want to exclude real genetic divergence with the bias that BIC would use. BIC chose the more simple HKY+I which is the simpler model. Can you help me write a script to construct a phylogeny tree using phangorn and build a plot?" (attached the results `mammoth_model_select_results.rds` and the sorted csv `mammoth_model_select_sorted_results.csv`).
+- **Exact output (verbatim):** 
+Good catch on landing on HKY+G(4)+I — that matches what AIC and AICc both say is your best model. I actually ran that check against your full results table, and here's the real finding:
+
+| Criterion | Best model |
+|---|---|
+| AIC | **HKY+G(4)+I** |
+| AICc | **HKY+G(4)+I** |
+| BIC | **HKY+I** (no gamma) |
+
+**AIC and BIC actually disagree** — and it's exactly the pattern we talked about. BIC's harsher penalty on a large alignment (your ~16,900 sites) pushed it to drop the rate-variation parameter (the `+G(4)` term) entirely and settle for the simpler model. The difference between the two models is just one parameter (87 vs. 86), but BIC decided that one extra parameter wasn't "worth" its cost under such a steep per-parameter penalty.
+
+**What to do with this:** go with **HKY+G(4)+I** (AIC's pick) for building your tree — mitochondrial DNA reliably does have real rate variation across sites, so there's good biological reason to trust AIC's answer over BIC's more conservative one here, consistent with what we discussed. 
+
+Glad that landed well — alright, Step B: building the actual tree.
+
+Quick concept before the script: we're not refitting the model from scratch. `modelTest()` already fit every candidate model under maximum likelihood just to score it, so phangorn kept those fitted results internally — we just pull out the one for HKY+G(4)+I and refine it further by searching for the best tree *topology* (not just branch lengths) using something called nearest-neighbor interchange rearrangements, which basically tries small rearrangements of the tree and keeps whichever improves the likelihood. Then we visualize it colored by your pre-/post-bottleneck groups, which doubles as the sanity check we talked about back when we first discussed why this step matters.
+```r
+04 tree building · R
+# =============================================================
+# Part 3, Step B: Building the Phylogenetic Tree
+# Mammoth mitogenome project — PUBH 6860
+# =============================================================
+# Goal: use the best-fit substitution model (HKY+G(4)+I) from
+# Step A to estimate a maximum-likelihood phylogenetic tree, then
+# visualize it labeled by pre-/post-bottleneck group as a sanity
+# check before moving on to diversity statistics (Part 5).
+ 
+library(phangorn)
+ 
+# ---- 1. Reload model testing results (if starting a new session) ----
+mt <- readRDS("model_test_results.rds")
+ 
+# ---- 2. Retrieve the already-fitted HKY+G(4)+I model ----
+# modelTest() already fit every candidate model under maximum
+# likelihood in order to score it — phangorn stores those fitted
+# objects internally, so we reuse the one we want instead of
+# rebuilding it from scratch.
+env <- attr(mt, "env")
+fit_init <- eval(get("HKY+G(4)+I", env), env)
+ 
+# ---- 3. Refine: full ML tree search ----
+# This searches for the best tree topology (via nearest-neighbor
+# interchange rearrangements) and optimizes branch lengths and the
+# model's own parameters (gamma shape, proportion of invariant
+# sites) together.
+#
+# NOTE: with 42 taxa and a ~16,900 bp alignment, this step can take
+# a while to run — let it finish.
+fit_ml <- optim.pml(fit_init,
+                     model    = "HKY",
+                     optNni   = TRUE,   # search tree topology
+                     optGamma = TRUE,   # optimize rate-variation parameter
+                     optInv   = TRUE)   # optimize proportion of invariant sites
+ 
+# Inspect the final fitted model (log-likelihood, parameter estimates)
+fit_ml
+ 
+# Extract the tree itself
+mammoth_tree <- fit_ml$tree
+ 
+# Save the tree in standard Newick format, so this slow step never
+# has to be rerun just to reuse the tree later
+write.tree(mammoth_tree, "mammoth_tree.nwk")
+ 
+# ---- 4. Visualize the tree, colored by pre-/post-bottleneck group ----
+# Bring in the sample metadata so we can label tips by group.
+metadata <- read.csv("mammoth_mitogenome_accessions.csv")
+ 
+# Tip labels look like "MG334270.1" (accession + version) — strip
+# the ".version" suffix so they match the Accession_No column.
+tip_accessions <- sub("\\..*$", "", mammoth_tree$tip.label)
+tip_groups <- metadata$Group[match(tip_accessions, metadata$Accession_No)]
+ 
+# Color tips: post-bottleneck (Wrangel) in red, pre-bottleneck in blue
+tip_colors <- ifelse(grepl("^Post", tip_groups), "firebrick", "steelblue")
+ 
+plot(mammoth_tree,
+     tip.color = tip_colors,
+     cex = 0.6,
+     no.margin = TRUE)
+legend("topleft",
+       legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"),
+       text.col = c("firebrick", "steelblue"),
+       bty = "n")
+ 
+# ---- 5. What to look for (sanity check before moving on) ----
+# - Do the 14 post-bottleneck tips cluster tightly together near
+#   the tips of the tree, consistent with a recent founder effect?
+# - Are the 28 pre-bottleneck tips more spread out across deeper
+#   branches, reflecting greater ancestral diversity?
+# - Is any single tip sitting on a dramatically longer branch than
+#   the rest? That can indicate a mislabeled sample, contamination,
+#   or a leftover alignment issue worth investigating before Part 4.
+ 
+
+```
+Run that top to bottom — expect the `optim.pml()` line to take a few minutes given the dataset size. Once the plot renders, send it over (or describe what you're seeing) and we'll check it against those sanity-check criteria before moving on.
+
+- **Verification:**

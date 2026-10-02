@@ -1,0 +1,11 @@
+# Notes
+## Progress - Completed
+1. Project topic: "Did genetic diversity in woolly mammoths drop after a small group became trapped on Wrangel Island?"
+2. Info on why the bottleneck happened: Rising sea levels cut Wrangel Island off from Siberia ~10,000 years ago. What the founder effect does to a gene pool (reduces diversity and randomly changes frequencies in a new, smaller populatoin), the distinction between "diversity dropped after isolation (well-supported) vs "that's what killed them (disputed). Will emphasize in discussion
+3. Identified exact paper (Pečnerová et al. 2017) built around this comparison, tracked down all 42 real GenBank accession numbers, sorted them into 14-post bottleneck (Wrangel Island) vs 28 pre-bottleneck (mainland Siberia) samples using radiocarbon dates (not just location labels).
+4. Pulled sequence data (downloaded all 42 mitogenomes from GenBank as 1 FASTA file).
+5. Aligned the sequences - ran MAFFT to line up all 42 sequences by homologous position, padding shorter/partials with gaps and confirmed all 42 came out at a uniform 16,905 bp. Matters for downstream trees, diversity stats, hypothesis tests which require sequences to be comparable column-by-column.
+6. Set up reproducibility structure.
+
+## Current: 
+7. Testing Substitution Models: installing ape and phangorn. Ape handles general phylogenetics file formats and tree manipulation. Phangorn does model testing and tree building. # Sort by AIC first, since mitochondrial DNA has almost always real rate variation and real invariant sites  and due to the large dataset, the BIC's harsh penalty would exclude those biological features and count them as statistical noise. Building a tree off of a model that assumes a more simple model than reality can risk underestimating genetic divergence between more distantly related samples. If AIC and BIC match, then extra confidence, if not, then sorting by AIC was because of the above justification. **AIC and AICc selected HKY+G(4)+I as the best-fitting substitution model, while BIC favored the simpler HKY+I. HKY+G(4)+I was retained given the well-documented rate heterogeneity across sites in mitochondrial genomes.**
