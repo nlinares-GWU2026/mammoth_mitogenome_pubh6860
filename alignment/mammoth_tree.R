@@ -29,16 +29,45 @@ metadata <- read.csv("mammoth_mitogenome_accessions.csv") # Make sure in current
 tip_accessions <- sub("\\..*$", "", mammoth_tree$tip.label)
 tip_groups <- metadata$Group[match(tip_accessions, metadata$Accession_No)]
 
+# Swap the long FASTA header labels for short Lab IDs
+tree_for_plot <- mammoth_tree
+tree_for_plot$tip.label <- metadata$Lab_ID[match(tip_accessions, metadata$Accession_No)]
 
+# Reserve blank whitespace below lowest tip so scalebar has place to sit without overlapping
+n_tips <- length(tree_for_plot$tip.label)
 
 # Color: Post-bottleneck = Pink, Pre-bottleneck = Blue
 tip_colors <- ifelse(grepl("^Post", tip_groups), "maroon", "darkblue")
 
-# Plot
-plot(mammoth_tree,
-     tip.color = tip_colors, cex = 0.5, no.margin = TRUE)
-legend("topleft", legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"), 
+# Save png
+png("mammoth_tree_plot.png", width = 2000, height = 1400, res = 180)
+plot(tree_for_plot, tip.color = tip_colors, cex = 0.8, no.margin = FALSE, y.lim = c(-3, n_tips +1))
+
+add.scale.bar(x = 0, y = -2)
+legend("topleft", legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"),
        text.col = c("maroon", "darkblue"),
-       bty = "n"
+       bty = "n")
+dev.off()
+
+# Plot
+plot(tree_for_plot, tip.color = tip_colors, cex = 0.75)
+add.scale.bar(x = 0, y = -2)
+legend("topright", legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"),
+       text.col = c("maroon", "darkblue"),
+       bty = "n")
        
-       
+# Which samples drive any squashed branches
+# node.depth.edgelength() give sthe cumulative distance from the root to every node
+root_to_tip <- node.depth.edgelength(tree_for_plot)[1:n_tips]
+
+divergence <- data.frame(
+  Lab_ID = tree_for_plot$tip.label,
+  root_to_tip_distance = root_to_tip
+)
+divergence <- merge(divergence, metadata[, c("Lab_ID", "Median_CalBP", "Group")])
+
+# Sorted descending - most divergent at top
+divergence[order(-divergence$root_to_tip_distance),]
+# Matches the outlier branch group, of (GilbertM20, GilbertM21, GilbertM25, Oimyakon)
+
+

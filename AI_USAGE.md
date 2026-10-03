@@ -239,7 +239,7 @@ mammoth_tree <- fit_ml$tree
 # has to be rerun just to reuse the tree later
 write.tree(mammoth_tree, "mammoth_tree.nwk")
  
-# ---- 4. Visualize the tree, colored by pre-/post-bottleneck group ----
+#  ---- 4. Visualize the tree, colored by pre-/post-bottleneck group ----
 # Bring in the sample metadata so we can label tips by group.
 metadata <- read.csv("mammoth_mitogenome_accessions.csv")
  
@@ -251,26 +251,69 @@ tip_groups <- metadata$Group[match(tip_accessions, metadata$Accession_No)]
 # Color tips: post-bottleneck (Wrangel) in red, pre-bottleneck in blue
 tip_colors <- ifelse(grepl("^Post", tip_groups), "firebrick", "steelblue")
  
-plot(mammoth_tree,
-     tip.color = tip_colors,
-     cex = 0.6,
-     no.margin = TRUE)
+# Swap the long FASTA header labels for short Lab IDs. The full
+# headers (e.g. "MG334272.1 Mammuthus primigenius isolate L158
+# mitochondrion, partial genome") eat up most of the plot's width,
+# which is what was squashing the branch lengths visually — ape
+# shrinks the tree to make room for whatever text it has to fit.
+tree_for_plot <- mammoth_tree
+tree_for_plot$tip.label <- metadata$Lab_ID[match(tip_accessions, metadata$Accession_No)]
+ 
+# Reserve blank space below the lowest tip so the scale bar has
+# somewhere to sit without overlapping a tip's branch line (this is
+# what caused the "2002/472" tip to look struck-through before —
+# the scale bar's default position happened to land right on it).
+n_tips <- length(tree_for_plot$tip.label)
+ 
+# Save a wide, high-resolution version to a file — a bigger canvas
+# gives branch-length differences more pixels to actually show up in,
+# rather than relying on RStudio's small default plot pane.
+png("mammoth_tree_plot.png", width = 2000, height = 1400, res = 180)
+plot(tree_for_plot, tip.color = tip_colors, cex = 0.8, no.margin = FALSE,
+     y.lim = c(-3, n_tips + 1))
+# A scale bar is the rigorous way to compare branch lengths — it
+# shows exactly what a given branch length means in substitutions
+# per site, rather than relying on eyeballing pixel distances.
+# x = 0 anchors it at the root; y = -2 drops it into the blank
+# margin we just reserved, below every tip.
+add.scale.bar(x = 0, y = -2)
+legend("topleft",
+       legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"),
+       text.col = c("firebrick", "steelblue"),
+       bty = "n")
+dev.off()
+ 
+# Also show it in your R session's plot pane
+plot(tree_for_plot, tip.color = tip_colors, cex = 0.8,
+     y.lim = c(-3, n_tips + 1))
+add.scale.bar(x = 0, y = -2)
 legend("topleft",
        legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"),
        text.col = c("firebrick", "steelblue"),
        bty = "n")
  
-# ---- 5. What to look for (sanity check before moving on) ----
-# - Do the 14 post-bottleneck tips cluster tightly together near
-#   the tips of the tree, consistent with a recent founder effect?
-# - Are the 28 pre-bottleneck tips more spread out across deeper
-#   branches, reflecting greater ancestral diversity?
-# - Is any single tip sitting on a dramatically longer branch than
-#   the rest? That can indicate a mislabeled sample, contamination,
-#   or a leftover alignment issue worth investigating before Part 4.
+# ---- 5. Diagnose: which samples are driving the squashed branches? ----
+# When most branches look crammed near zero, it's usually because one
+# branch (or clade) is far more divergent than everything else, and
+# the plot has to scale its whole x-axis to fit that one branch —
+# compressing all the "normal" variation into a tiny sliver of space.
+#
+# node.depth.edgelength() gives the cumulative distance from the root
+# to every node. For tips, that's the total branch length separating
+# each sample from the root — the most reliable way to spot an
+# outlier, since the "long branch" might be an internal branch shared
+# by several tips rather than any single tip's own terminal branch.
+root_to_tip <- node.depth.edgelength(tree_for_plot)[1:n_tips]
  
-
+divergence <- data.frame(
+  Lab_ID = tree_for_plot$tip.label,
+  root_to_tip_distance = root_to_tip
+)
+divergence <- merge(divergence, metadata[, c("Lab_ID", "Median_CalBP", "Group")],
+                     by = "Lab_ID")
+ 
+# Sorted descending — the most divergent samples float to the top
+divergence[order(-divergence$root_to_tip_distance), ]
 ```
 Run that top to bottom — expect the `optim.pml()` line to take a few minutes given the dataset size. Once the plot renders, send it over (or describe what you're seeing) and we'll check it against those sanity-check criteria before moving on.
-
-- **Verification:**
+- **Verification:** I typed out and edited the code as I needed it. This code was causing issues for me and did not need all the extra steps Claude included 
