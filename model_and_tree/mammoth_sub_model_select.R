@@ -1,6 +1,6 @@
 # Choosing Substitution Model to see which describes how these 42 mitogenomes actually evolved
 
-setwd("C:/Users/nelin/Desktop/GWU Information/GWU Fall 2026/Princip_Bioinformatics/mammoth_mitogenome_pubh6860/alignment")
+setwd("C:/Users/nelin/Desktop/GWU Information/GWU Fall 2026/Princip_Bioinformatics/mammoth_mitogenome_pubh6860/model_and_tree")
 # install.packages("ape")
 # install.packages("phangorn")
 library(ape)

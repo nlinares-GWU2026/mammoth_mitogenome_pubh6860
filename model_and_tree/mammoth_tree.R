@@ -1,5 +1,5 @@
 # Phylogenetic Tree - (HKY+G(4)+I) used to estimate maximum-likelihood tree
-setwd("C:/Users/nelin/Desktop/GWU Information/GWU Fall 2026/Princip_Bioinformatics/mammoth_mitogenome_pubh6860/alignment")
+setwd("C:/Users/nelin/Desktop/GWU Information/GWU Fall 2026/Princip_Bioinformatics/mammoth_mitogenome_pubh6860/model_and_tree")
 library(phangorn)
 # Load .rds from "mammoth_sub_model_select.R"
 mt <- readRDS("mammoth_model_select_results.rds")

@@ -316,4 +316,103 @@ divergence <- merge(divergence, metadata[, c("Lab_ID", "Median_CalBP", "Group")]
 divergence[order(-divergence$root_to_tip_distance), ]
 ```
 Run that top to bottom — expect the `optim.pml()` line to take a few minutes given the dataset size. Once the plot renders, send it over (or describe what you're seeing) and we'll check it against those sanity-check criteria before moving on.
-- **Verification:** I typed out and edited the code as I needed it. This code was causing issues for me and did not need all the extra steps Claude included 
+- **Verification:** I typed out and edited the code as I needed it. This code was causing issues for me and did not need all the extra steps Claude included. I edited the plot to fit what I found looked readable and clear. I also investigated the placement of P011 (pre-bottleneck) and noted the probability of its placement among the post-bottleneck group being due to its radiocarbon date and P011 having some of the most gaps in its sequence. 
+
+## Entry 6
+- **Tool:** Claude (Sonnet 5)
+- **What I was doing:** Despite the metadata CSV labeling each sample as Pre- or Post- bottleneck, the diversity statistics needs the actual aligned sequences split into groups. So I needed to upload the aligned files and run diversity statistics with the 14 post-bottleneck and teh 28 pre-bottleneck. 
+- **What I asked (verbatim):** Can you help me write a script that time-bins the aligned samples into pre- and post-bottle neck groups (referencing metadata `mammoth_mitogenome_accessions.cv`) and save into a FASTA file for both for downstream diversity statistics? I plan on **FINISH WHAT STATS FUNCTION DIVERSITY STATISTIC WILL USE**
+- **Exact output (verbatim):**
+```r
+
+/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+05 time binning · R
+# =============================================================
+# Part 4: Time-Binning — Splitting Samples into Pre-/Post-Bottleneck Groups
+# Mammoth mitogenome project — PUBH 6860
+# =============================================================
+# Goal: using the group assignments already established in the
+# sample metadata, split the ALIGNED sequences themselves into two
+# subsets — post-bottleneck (Wrangel Island) and pre-bottleneck
+# (Siberia) — ready for the diversity statistics in Part 5.
+#
+# This is a separate, necessary step even though the group labels
+# already exist in your metadata CSV: diversity statistics are
+# computed on the actual sequence alignment, not on a spreadsheet
+# column or the tree.
+ 
+library(ape)
+ 
+# ---- 1. Load the alignment as a DNAbin object ----
+# DNAbin is ape's compact binary format for DNA sequences, and it's
+# what population-genetics functions in Part 5 (e.g., from the pegas
+# package) expect as input.
+mammoth_dna <- read.dna("mammoth_aligned.fasta", format = "fasta")
+ 
+# Sanity check: should report 42 sequences, 16,905 bp each
+dim(mammoth_dna)
+ 
+# ---- 2. Match each sequence to its pre-/post-bottleneck group ----
+metadata <- read.csv("mammoth_mitogenome_accessions.csv")
+ 
+# Sequence names are still in "ACCESSION.version" form (e.g.
+# "MG334270.1") — strip the version suffix to match Accession_No.
+seq_accessions <- sub("\\..*$", "", rownames(mammoth_dna))
+seq_groups <- metadata$Group[match(seq_accessions, metadata$Accession_No)]
+ 
+# Confirm every sequence matched to a group. Expect THREE labels, not
+# two: "Post-bottleneck" (14), "Pre-bottleneck" (22), and
+# "Pre-bottleneck (undated)" (6). The 6 undated samples are still
+# pre-bottleneck — "undated" only means the source table gave no
+# precise calibrated date for them (just a minimum age, or no date at
+# all). The thing to check is that there are no NA entries: an NA
+# would mean an accession in your alignment didn't match anything in
+# the metadata CSV, which would be worth tracking down.
+table(seq_groups, useNA = "ifany")
+ 
+# Collapse the three labels into a clean two-level group variable.
+# grepl("^Pre") catches both "Pre-bottleneck" and "Pre-bottleneck
+# (undated)", so the 22 + 6 samples combine into one group of 28.
+seq_groups_clean <- ifelse(grepl("^Post", seq_groups),
+                           "Post-bottleneck", "Pre-bottleneck")
+ 
+# Should now show exactly 14 Post and 28 Pre
+table(seq_groups_clean, useNA = "ifany")
+ 
+# ---- 3. Split into two DNAbin subsets ----
+post_bottleneck <- mammoth_dna[seq_groups_clean == "Post-bottleneck", ]
+pre_bottleneck  <- mammoth_dna[seq_groups_clean == "Pre-bottleneck", ]
+ 
+# Confirm the split matches expectations: 14 post, 28 pre
+dim(post_bottleneck)
+dim(pre_bottleneck)
+ 
+# ---- 4. Save both subsets for use in Part 5 ----
+# As FASTA, in case you want to inspect them directly or use them in
+# another tool later:
+write.dna(post_bottleneck, "post_bottleneck_aligned.fasta", format = "fasta")
+write.dna(pre_bottleneck, "pre_bottleneck_aligned.fasta", format = "fasta")
+ 
+# And as a single RDS file, so Part 5 can load both DNAbin objects
+# directly without re-parsing FASTA files each time:
+saveRDS(list(post = post_bottleneck, pre = pre_bottleneck),
+        "time_binned_alignments.rds")
+ 
+```
+- **Verification:**

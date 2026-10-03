@@ -1,0 +1,43 @@
+Lab_ID,C14_Lab_No,C14_BP_Date,Median_CalBP,Material,Location,Accession_No,Reference,Haplotype,Group
+E469D,Ua-13366,3685±60,4024,Tooth,Wrangel Island,MG334270,This study,W7,Post-bottleneck
+E468,LU-2741,3730±40,4079,Tusk,Wrangel Island,MG334269,This study,W1,Post-bottleneck
+E467,AA40665,3905±47,4336,Tooth,Wrangel Island,MG334268,This study,W1,Post-bottleneck
+E466,GIN-6985,3920±40,4354,Tusk,Wrangel Island,MG334267,This study,W6,Post-bottleneck
+E465,LU-4448,4120±110,4643,Tusk,Wrangel Island,MG334266,This study,W5,Post-bottleneck
+E464,Ua-13375,4210±70,4726,Tooth,Wrangel Island,MG334265,This study,W1,Post-bottleneck
+E460,LU-2756,4400±40,4969,Tusk,Wrangel Island,MG334264,This study,W4,Post-bottleneck
+M28,GIN-6988,5610±40,6380,Tusk,Wrangel Island,MG334281,This study,W4,Post-bottleneck
+L459,OxA-30117*,6148±32,7060,Tusk,Wrangel Island,MG334276,This study,W4,Post-bottleneck
+M26,LU-2799,6260±50,7194,Tooth,Wrangel Island,MG334280,This study,W3,Post-bottleneck
+L386,Ua-13374,6410±90,7336,Tooth,Wrangel Island,MG334274,This study,W4,Post-bottleneck
+M23,LU-4449,6560±60,7470,Tusk,Wrangel Island,MG334279,This study,W2,Post-bottleneck
+M17,Ua-13372,7510±80,8318,Tooth,Wrangel Island,MG334278,This study,W1,Post-bottleneck
+L468,OxA-30122*,7711±36,8491,Bone,Wrangel Island,MG334277,This study,W1,Post-bottleneck
+P011,GrA-65691*,10240±50,11972,Tusk,Taimyr Peninsula,MG334285,This study,S5,Pre-bottleneck
+P005,GrA-65686*,10920±50,12775,Tusk,New Siberian Islands,MG334283,This study,S3,Pre-bottleneck
+Ber28,UCIAMS38670,12125±30,14011,n.a.,Berelekh,KX027495,Enk et al. 2016,S24,Pre-bottleneck
+Krause,KIA-25289,12170±50,14056,Bone,Yakutia,DQ188829,Krause et al. 2006,S22,Pre-bottleneck
+L410,OxA-31180*,12370±55,14408,Tooth,Wrangel Island (pre-isolation),MG334275,This study,W9,Pre-bottleneck
+L158,OxA-20046,12380±45,14431,Humerus,"Pioneyveem River, Chukotka",MG334272,This study,S1,Pre-bottleneck
+P009,GrA-65689*,13030±60,15602,Tusk,New Siberian Islands,MG334284,This study,S4,Pre-bottleneck
+L164,OxA-20048,13935±50,16901,Tusk,"Pioneyveem River, Chukotka",MG334273,This study,S2,Pre-bottleneck
+GilbertM15,OxA-19605,13995±55,16996,Hair,"Ayon Island, Chukotka",EU153446,Gilbert et al. 2008,S13,Pre-bottleneck
+GilbertM18,OxA-17116,17125±70,20655,Hair,Gydan Peninsula,EU153447,Gilbert et al. 2007,S14,Pre-bottleneck
+GilbertM4,OxA-17098,18545±70,22422,Hair,n.a.,EU153456,Gilbert et al. 2007,S9,Pre-bottleneck
+GilbertM19,GrN-28258,18560±50,22434,Hair,Yakutia,EU153448,Gilbert et al. 2008,S9,Pre-bottleneck
+GilbertM2,UtC-8138,20380±140,24507,Hair,Taimyr Peninsula,EU153449,Gilbert et al. 2007,S7,Pre-bottleneck
+GilbertM3,Beta-148647,20620±70,24833,Hair,Taimyr Peninsula,EU153455,Gilbert et al. 2007,S8,Pre-bottleneck
+GilbertM26,OxA-17114,24740±110,28769,Hair,Indigirka,EU153454,Gilbert et al. 2007,S19,Pre-bottleneck
+Poinar,Beta-210777,27740±220,31501,Bone,Taimyr Peninsula,EU155210,Poinar et al. 2006,S20,Pre-bottleneck
+GilbertM13,T-171,35800±1200,40418,Hair,Lena River,EU153445,Gilbert et al. 2007,S12,Pre-bottleneck
+E470,LU-3511,37080±1650,41632,Bone,Wrangel Island (pre-isolation),MG334271,This study,W8,Pre-bottleneck
+Oimyakon,GrA-30727,41300±900,44828,Skin,Yakutia,MG334282,Palkopoulou et al. 2015,S23,Pre-bottleneck
+GilbertM8,OxA-17102,46900±700,46962,Hair,Magadan,EU153458,Gilbert et al. 2007,S11,Pre-bottleneck
+GilbertM22,OxA-17111,50200±900,50304,Hair,New Siberian Islands,EU153452,Gilbert et al. 2007,S17,Pre-bottleneck
+GilbertM25,OxA-19610,59300±2700,60495,Hair,Yakutia,EU153453,Gilbert et al. 2008,S18,Pre-bottleneck
+GilbertM1,n.a.,n.a.,n.a.,Hair,n.a.,EU153444,Gilbert et al. 2007,S6,Pre-bottleneck (undated)
+GilbertM5,n.a.,n.a.,n.a.,Hair,n.a.,EU153457,Gilbert et al. 2007,S10,Pre-bottleneck (undated)
+GilbertM20,OxA-19608,>63500,n.a.,Hair,New Siberian Islands,EU153450,Gilbert et al. 2008,S15,Pre-bottleneck (undated)
+GilbertM21,OxA-19609,>58000,n.a.,Hair,New Siberian Islands,EU153451,Gilbert et al. 2008,S16,Pre-bottleneck (undated)
+Rogaev,MAG-1000,33750-31950,n.a.,Muscle,"Enmynveem River, Chukotka",DQ316067,Rogaev et al. 2006,S21,Pre-bottleneck (undated)
+2002/472,UCIAMS38677,>48800,n.a.,n.a.,Taimyr Peninsula,KX027489,Enk et al. 2016,S25,Pre-bottleneck (undated)
