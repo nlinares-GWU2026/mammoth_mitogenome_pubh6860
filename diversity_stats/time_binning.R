@@ -16,7 +16,7 @@ metadata <- read.csv("mammoth_mitogenome_accessions.csv")
 seq_accessions <- sub("\\..*$", "", rownames(mammoth_dna))
 seq_groups <- metadata$Group[match(seq_accessions, metadata$Accession_No)]
 
-# Confirm every seq matched to a group (either pre- or post-) with counts of 14 and 28 - no NA entries
+# Confirm every seq matched to a group (either pre- or post- with 3 labels) with counts of 14 and 28 - no NA entries
 table(seq_groups, useNA = "ifany") # Expect that 6 pre-bottleneck are undated but still classified as pre-bottleneck
 
 # Collapse 3 labels into two-level group variable
@@ -26,8 +26,14 @@ seq_groups_clean <- ifelse(grepl("^Post", seq_groups), "Post-bottleneck", "Pre-b
 table(seq_groups_clean, useNA = "ifany")
 
 # Split into 2 DNAbin subsets
-post_bottleneck <- mammoth_dna[seq_groups_clean == "Post-bottleneck"]
-pre_bottleneck <- mammoth_dna[seq_groups_clean == "Pre-bottleneck"]
+post_bottleneck <- mammoth_dna[seq_groups_clean == "Post-bottleneck", ]
+pre_bottleneck <- mammoth_dna[seq_groups_clean == "Pre-bottleneck", ]
 #Confirm the split matches 
 dim(post_bottleneck)
 dim(pre_bottleneck)
+
+# Save FASTA files of info for diversity stats
+write.dna(post_bottleneck, "post_bottleneck_aligned.fasta", format = "fasta")
+write.dna(pre_bottleneck, "pre_bottleneck_aligned.fasta", format = "fasta")
+# Save as a single RDS file so diversity stats script can load both DNAbin objs without re-parsing FASTA
+saveRDS(list(post = post_bottleneck, pre = pre_bottleneck), "time_binned_alignments.rds")

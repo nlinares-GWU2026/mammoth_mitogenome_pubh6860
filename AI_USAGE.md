@@ -1,5 +1,5 @@
 # AI USAGE LOG
-Claude had access to my initial sources, project idea, project guidelines, and goals in initial  chat.
+Claude had access to my initial sources, accessions,aligned data, project idea, project guidelines, and goals in initial  chat.
 - **Tool:**
 - **What I was doing:**
 - **What I asked (verbatim):**
@@ -321,27 +321,9 @@ Run that top to bottom — expect the `optim.pml()` line to take a few minutes g
 ## Entry 6
 - **Tool:** Claude (Sonnet 5)
 - **What I was doing:** Despite the metadata CSV labeling each sample as Pre- or Post- bottleneck, the diversity statistics needs the actual aligned sequences split into groups. So I needed to upload the aligned files and run diversity statistics with the 14 post-bottleneck and teh 28 pre-bottleneck. 
-- **What I asked (verbatim):** Can you help me write a script that time-bins the aligned samples into pre- and post-bottle neck groups (referencing metadata `mammoth_mitogenome_accessions.cv`) and save into a FASTA file for both for downstream diversity statistics? I plan on **FINISH WHAT STATS FUNCTION DIVERSITY STATISTIC WILL USE**
+- **What I asked (verbatim):** "Can you help me write a script that time-bins the aligned samples into pre- and post-bottle neck groups (referencing metadata `mammoth_mitogenome_accessions.cv`) and save into a FASTA file for both for downstream diversity statistics? I plan on computing nucleotide diversity (pi), segregating sites (S), and haplotype diversity (Hd).
 - **Exact output (verbatim):**
 ```r
-
-/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 05 time binning · R
 # =============================================================
 # Part 4: Time-Binning — Splitting Samples into Pre-/Post-Bottleneck Groups
@@ -415,4 +397,46 @@ saveRDS(list(post = post_bottleneck, pre = pre_bottleneck),
         "time_binned_alignments.rds")
  
 ```
+- **Verification:** I ran the script and inspected the output. The numbers were as I expected with the post-bottleneck containing 14 seqs and the pre-bottleneck containing 28 and both having 16905 nucleotides. Every seq matched to a group. 
+
+## Entry 7
+- **Tool:** Claude (Sonnet 5.5)
+- **What I was doing:** Running diversity statistics.
+- **What I asked (verbatim):** "Can you help me write a script that measures these 3 diversity statistics on the `time_binned_alignments.rds` from the previous script using the same packages `ape` and `pegas`: 1) Nucleotide diversity - average fraction of sites where they differ (pi), 2) Segregating sites - number of alignment positions that vary within the group (S), and 3) Haplotype diversity - probability that two randomly chosen seqs are different haplotypes? Keep in mind when designing the script that the alignment of my sequences has gaps and N's so the diversity statistics should be run on those columns with a real base. 
+- **Exact output (verbatim):**
+### Part 5: diversity statistics
+
+This is the step that puts numbers on what the tree showed visually. I've put the script above in `06_diversity_stats.R`. It computes three standard measures for each group:
+
+- **Nucleotide diversity (π):** pick any two sequences in a group, and π is the average fraction of sites where they differ. It is the main measure here.
+- **Segregating sites (S):** the number of alignment positions that vary at all within the group.
+- **Haplotype diversity (Hd):** the probability that two randomly chosen sequences are different haplotypes. A haplotype is a unique version of the sequence.
+
+**The design decision to understand:** your alignment has gaps and N's, mostly in the partial-genome ancient samples. A gap or N means "we don't know this base." It does not mean the base is different, so those positions can't count as differences. The script keeps only columns where all 42 sequences have a real base, and it uses those same columns for both groups. If each group were trimmed separately, they would be measured over different stretches of the genome, and a diversity difference could just reflect which sites survived. Section 5 of the script re-checks π using pairwise deletion, the opposite approach. If both methods tell the same story, your result doesn't depend on how missing data was handled.
+
+### What you should see
+
+Your R output should match these numbers. If it doesn't, tell me, because that would point to a bug in one of the two.
+
+| | Post (Wrangel) | Pre (Siberia) |
+|---|---|---|
+| Sequences | 14 | 28 |
+| Sites used | 11,153 (of 16,905) | 11,153 |
+| π | ~0.0001 | ~0.0050 |
+| Segregating sites | 6 | 300 |
+| Haplotypes | 7 | 27 |
+| Hd | ~0.82 | ~0.997 |
+
+Two cross-checks give me confidence in the logic. The haplotype counts match the published labels from your Table 1: the Wrangel samples carry W1–W7 (7 haplotypes), and the pre-bottleneck samples have 27 distinct labels (S1–S25, with two samples sharing S9, plus W8 and W9). Independent calculations agree with the paper's own haplotype assignments.
+
+The difference in π is large, about 50-fold, which is the founder-effect signature your project is testing for.
+
+### Caveats to keep in mind
+
+- **Sample sizes differ (14 vs. 28).** S and the haplotype count tend to grow with sample size, so they are not a fair comparison on their own. π and Hd are less sensitive, and this can be adressed directly by repeatedly drawing random sets of 14 from the 28 pre-bottleneck samples.
+- **The pre-bottleneck group is a mix.** It spans roughly 12,000 to 60,000+ years and includes the deeply divergent ancient clade from your tree. That clade inflates the group's π. Redoing the calculation without those four samples would show how much they contribute.
+- **Complete deletion drops 34% of sites** (5,752 columns), because the partial genomes are missing different regions. This is the reason for the pairwise-deletion check in Section 5.
+- **Hd for the pre group is nearly 1** because almost every sequence is unique. It can't rise much higher, so it tells you less than π does.
+
+Run the script and send me the `results` table and the pairwise-deletion output. Then we can compare them with the preview.
 - **Verification:**
