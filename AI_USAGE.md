@@ -413,6 +413,106 @@ This is the step that puts numbers on what the tree showed visually. I've put th
 - **Haplotype diversity (Hd):** the probability that two randomly chosen sequences are different haplotypes. A haplotype is a unique version of the sequence.
 
 **The design decision to understand:** your alignment has gaps and N's, mostly in the partial-genome ancient samples. A gap or N means "we don't know this base." It does not mean the base is different, so those positions can't count as differences. The script keeps only columns where all 42 sequences have a real base, and it uses those same columns for both groups. If each group were trimmed separately, they would be measured over different stretches of the genome, and a diversity difference could just reflect which sites survived. Section 5 of the script re-checks π using pairwise deletion, the opposite approach. If both methods tell the same story, your result doesn't depend on how missing data was handled.
+```r
+
+06 diversity stats · R
+# =============================================================
+# Part 5: Diversity Statistics by Group
+# Mammoth mitogenome project — PUBH 6860
+# =============================================================
+# Goal: quantify genetic diversity in the post-bottleneck (Wrangel
+# Island) and pre-bottleneck (Siberia) groups, using the three
+# standard measures:
+#   - Nucleotide diversity (pi): the average proportion of sites at
+#     which two randomly chosen sequences differ.
+#   - Segregating sites (S): how many alignment positions vary at all.
+#   - Haplotype diversity (Hd): the probability that two randomly
+#     chosen sequences are different haplotypes.
+#
+# These are calculated by hand with ape + base R (rather than a
+# population-genetics package) so every number is traceable to a
+# line of code, and so no new package needs adding to renv.
+ 
+library(ape)
+ 
+# ---- 1. Load the two group alignments from Part 4 ----
+binned <- readRDS("time_binned_alignments.rds")
+post <- binned$post   # 14 sequences
+pre  <- binned$pre    # 28 sequences
+ 
+# ---- 2. Choose the sites every group will be compared on ----
+# The alignment contains gaps (-) and Ns (unknown bases), mostly in
+# the partial-genome ancient samples. A gap or N is "we don't know,"
+# not "this base is different," so those positions can't be counted
+# as differences.
+#
+# Approach: keep only alignment columns where ALL 42 sequences have
+# a real base (A, C, G, or T). Using the same set of columns for both
+# groups matters — if each group were trimmed separately, they'd be
+# measured over different stretches of the genome, and a difference
+# in diversity could just reflect which sites were kept.
+all_dna   <- rbind(post, pre)
+all_chars <- as.character(all_dna)     # matrix of single letters
+ 
+callable <- apply(all_chars, 2, function(col) all(col %in% c("a", "c", "g", "t")))
+ 
+# How many of the 16,905 alignment columns survive?
+sum(callable)
+mean(callable)   # as a proportion
+ 
+post_sites <- as.character(post)[, callable]
+pre_sites  <- as.character(pre)[, callable]
+ 
+# ---- 3. A function that computes all three statistics ----
+diversity_stats <- function(char_mat) {
+  n <- nrow(char_mat)
+ 
+  # Nucleotide diversity (pi): average pairwise difference per site.
+  # dist.dna(model = "raw") returns, for every pair of sequences, the
+  # proportion of sites that differ; pi is the mean of those values.
+  pair_dist <- dist.dna(as.DNAbin(char_mat), model = "raw")
+  pi <- mean(as.vector(pair_dist))
+ 
+  # Segregating sites (S): columns containing more than one distinct base.
+  S <- sum(apply(char_mat, 2, function(col) length(unique(col)) > 1))
+ 
+  # Haplotypes: sequences that are identical across every kept site
+  # are the same haplotype. Paste each row into one long string and
+  # count the distinct strings.
+  hap_ids    <- apply(char_mat, 1, paste, collapse = "")
+  hap_counts <- table(hap_ids)
+  n_hap      <- length(hap_counts)
+ 
+  # Haplotype diversity (Nei & Tajima): 1 minus the sum of squared
+  # haplotype frequencies, with an n/(n-1) small-sample correction.
+  p  <- as.numeric(hap_counts) / n
+  Hd <- (n / (n - 1)) * (1 - sum(p^2))
+ 
+  data.frame(n_seqs           = n,
+             sites_used       = ncol(char_mat),
+             pi               = pi,
+             segregating_sites = S,
+             n_haplotypes     = n_hap,
+             hap_diversity    = Hd)
+}
+ 
+# ---- 4. Run it on each group and save the results ----
+results <- rbind(Post = diversity_stats(post_sites),
+                 Pre  = diversity_stats(pre_sites))
+results
+ 
+write.csv(results, "diversity_stats_by_group.csv")
+ 
+# ---- 5. Optional sensitivity check: pairwise deletion ----
+# Section 2 threw away every column where ANY sample had a gap or N.
+# Pairwise deletion is the opposite extreme: for each pair of
+# sequences, use every site where BOTH have a real base. If pi tells
+# the same story under both approaches, the result doesn't depend on
+# how missing data was handled.
+pi_post_pairwise <- mean(as.vector(dist.dna(post, model = "raw", pairwise.deletion = TRUE)))
+pi_pre_pairwise  <- mean(as.vector(dist.dna(pre,  model = "raw", pairwise.deletion = TRUE)))
+c(Post = pi_post_pairwise, Pre = pi_pre_pairwise)
+```
 
 ### What you should see
 

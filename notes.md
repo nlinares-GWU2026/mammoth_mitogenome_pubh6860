@@ -1,4 +1,4 @@
-# Notes
+  # Notes
 ## Progress - Completed
 1. Project topic: "Did genetic diversity in woolly mammoths drop after a small group became trapped on Wrangel Island?"
 2. Info on why the bottleneck happened: Rising sea levels cut Wrangel Island off from Siberia ~10,000 years ago. What the founder effect does to a gene pool (reduces diversity and randomly changes frequencies in a new, smaller populatoin), the distinction between "diversity dropped after isolation (well-supported) vs "that's what killed them (disputed). Will emphasize in discussion
@@ -11,4 +11,5 @@
 9.  Time binning: the metadata already labels each sample as pre- or post-bottleneck, but diversity stats needs the actual aligned sequences split into two separate groups (not just the tree and not just the metadata). This will take one combined alignment FASTA and produces two one with just 14 post bottleneck and one with just 28 pre-bottleneck ready to give to diversity calculations. 
 
 ## Current: 
-10. Diversity statistics: 
+10. Diversity statistics: With the time-binned alignment sequences, I need to run diversity statistics. I chose 3 to run: nucleotide diversity (pi), that calculates the average proportion of genetic differences between any two seqs picked at random from a group, segregating sites (S), which is the total count of alignment positions (columns) where at least one sample has a different DNA base, and haplotype diversity (Hd), which is the probability that two randomly chosen individuals have different unique seq variations/haplotypes. Since the acient DNA is damaged or incomplete the script will: 1) drop any alignment column that contains missing data (N's or gaps) in *any* of the 42 samples, leaving 11,153 clean positions, 2) measure both pre-bottleneck and post-bottleneck across the exact same sequence positions (if trimmed separately it would be comparing different regions of the genome which could skew the results), and 3) will re-run nucleotide diversity (pi) using *pairwise deletion* which skips missing data pair by pair. 
+**Main Biological Insight:**
