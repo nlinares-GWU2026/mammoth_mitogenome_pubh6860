@@ -539,4 +539,21 @@ The difference in π is large, about 50-fold, which is the founder-effect signat
 - **Hd for the pre group is nearly 1** because almost every sequence is unique. It can't rise much higher, so it tells you less than π does.
 
 Run the script and send me the `results` table and the pairwise-deletion output. Then we can compare them with the preview.
+- **Verification:** I typed out the script, found the Nei and Tajima paper with the haplotype frequency calculation, verified it, and added it to my sources. Then visually inspected the results compared to the output that Claude independently decided to run. The numbers matched. There is a significant gap between the pi of the pre-bottle neck and the post-bottle neck (Pre / Post is 50x higher in pre wth complete deletion and 11x higher in pre with pairwise deletion) in both the complete deletion and the pairwise deletion methods. I decided to keep complete deletion was chosen as the primary analysis with the pairwise analysis being a sensitivity check. 
+```r
+# Complete deletion
+    n_seqs sites_used           pi segregating_sites n_haplotypes hap_diversity
+Post     14      11153 0.0001034561                 6            7     0.8241758
+Pre      28      11153 0.0049454034               300           27     0.9973545
+
+# Pairwise deletion
+        Post          Pre 
+0.0004051837 0.0045286179 
+```
+
+## Entry 8 
+- **Tool:** Claude (Sonnet 5.5)
+- **What I was doing:** Running hypothesis test
+- **What I asked (verbatim):** "I decided to keep complete deletion was chosen as the primary analysis with the pairwise analysis being a sensitivity check. 
+- **Exact output (verbatim):**
 - **Verification:**

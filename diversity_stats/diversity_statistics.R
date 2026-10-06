@@ -33,11 +33,47 @@ pre_sites <- as.character(pre)[, callable]
 
 ##### FUNCTION FOR ALL 3 DIVERSITY STATS #####
 diversity_stats <- function(char_mat) {
-  n <- row(char_mat)
+  n <- nrow(char_mat)
   
   # Nucleotide Diversity (pi): avg pairwise difference per site
   pair_dist <- dist.dna(as.DNAbin(char_mat), model = "raw") # Returns for every pair of sequences, the proportion of sites that differ 
   pi <- mean(as.vector(pair_dist)) # Mean of those values
   
-  # Segregating sites (S): columns containing more than one distinct base. 
+  # Segregating sites (S): columns containing more than one distinct base
+  S <- sum(apply(char_mat, 2, function(col) length(unique(col)) > 1)) # Scans through matrix col by col for each col counts how many UNIQUE dna bases exist
+  # If more than one distinct letter = segregating site
+  
+  # Haplotypes: sequences that are identical across every kept site are the SAME HAPLOTYPE.
+  hap_ids <- apply(char_mat, 1, paste, collapse = "")
+  # Glues all letters in each individual sample's row together to form a single long DNA string for each sample
+  hap_counts <- table(hap_ids)
+  # Counts how many times each unique seq string appears in sample group 
+  n_hap <- length(hap_counts) # Total number of distinct unique seq variations (haplotypes) present in the group
+  
+  # Haplotype diversity (Nei & Tajima): 1 minus the sum of squared haplotype frequencies,
+  # with an n/(n-1) small-sample correction
+  p <- as.numeric(hap_counts) / n # Calculates the proportion of each haplotype in the group by dividing its count by total number of sequences
+  Hd <- (n / (n -1)) * (1 - sum(p^2)) # Nei and Tajima formula to cacluate Haplotype diversity 
+  
+  # Packages all calculated statistics into single dataframe which finishes the function
+  data.frame(n_seqs = n,
+             sites_used = ncol(char_mat),
+             pi = pi,
+             segregating_sites = S,
+             n_haplotypes = n_hap,
+             hap_diversity = Hd)
 }
+
+# Results (per group)
+results <- rbind(Post = diversity_stats(post_sites),
+                 Pre = diversity_stats(pre_sites))
+results
+
+write.csv(results, "diversity_stats_by_group.csv")
+
+# Pairwise deletion sensitivity check
+# Instead of above approach which threw away the COLUMN in seq alignment if even one sample is missing a base (risk of discarding good data)
+# pairwise deletion only ignores missing bases on a pair by pair basis (different pairs of samples are compared across slightly different lengths/regions of genome but use more data)
+pi_post_pairwise <- mean(as.vector(dist.dna(post, model = "raw", pairwise.deletion = TRUE))) # Nucleotide distances for pre and post and averages for pi. 
+pi_pre_pairwise <- mean(as.vector(dist.dna(pre, model = "raw", pairwise.deletion = TRUE)))
+c(Post = pi_post_pairwise, Pre = pi_pre_pairwise) # Labeled vector
