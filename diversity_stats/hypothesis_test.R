@@ -95,7 +95,7 @@ hist(res_all$null, breaks = 50,
      main = "Permutation test: difference in pi (Pre - Post)",
      xlab = "Difference in nucleotide diversity under shuffled labels")
 abline(v = res_all$observed, col = "firebrick", lwd = 2)
-legend("topright", legend = "Observed difference", col = "firebrick", lwd = 2, bty = "n")
+legend("topleft", legend = "Observed difference", col = "firebrick", lwd = 2, bty = "n")
 dev.off()
 
 
