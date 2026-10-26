@@ -762,4 +762,134 @@ I can't run R here, so I replicated the same logic in Python on your alignment. 
 **Reading Analysis C:** in all 10,000 random draws of 14 Pre samples, none had π, segregating sites, or haplotype counts as low as Post's. The sample size mismatch doesn't explain the result.
 
 Run the script and send me the console output for `test_summary` and `rare_summary`. 
-- **Verification:** I typed up the script, compared my results against Claude's independently run python script, 
+- **Verification:** I typed up the script, compared my results against Claude's independently run python script.
+
+## Entry 9:
+- **Tool:** Claude (Sonnet 5.5)
+- **What I was doing:** Implementing Snakemake
+- **What I asked (verbatim):** (attached repository) "Would Snakemake or Nextflow be able to be implemented into this project? If so, could you help me implement it? Which edits to scripts and the repo need to be made?" 
+- **Exact output (verbatim):**
+Yes, this can be implemented, and I'd use **Snakemake**, not Nextflow. I wrote a draft Snakefile for your repo and dry-run checked it. A dry run only confirms the steps chain together correctly. I haven't run the real analysis through it, because R and MAFFT aren't installed in my workspace.
+
+### Why Snakemake
+- **Your pipeline is a short, straight line.** Seven steps pass files to the next one, which is what Snakemake is built for.
+- **It fits your tools.** It's Python-based, so it works with the conda setup you already use in WSL. Nextflow needs Java and its own Groovy-style language, and that's overkill here.
+- **It matches your proposal.** The proposal commits to a Snakemake *or* Nextflow wrapper, so Snakemake satisfies it.
+
+### What the draft does
+The Snakefile has eight rules, one per pipeline step, plus a final `all` target: download, align, verify the alignment, model selection, tree, time-binning, diversity statistics and the permutation test. Snakemake works out the order from each rule's inputs and outputs, and it only re-runs steps whose inputs changed. That means the slow `modelTest` step won't repeat unless the alignment changes. The pipeline graph shows the structure.
+
+### What has to change in your repo first
+The Snakefile is not drop-in, because your scripts were written to run by hand in RStudio. These are the changes:
+1. **Remove the hardcoded `setwd("C:/Users/nelin/...")` lines.** They are in four scripts: `mafft_mammoth_verify.R`, `mammoth_sub_model_select.R`, `mammoth_tree.R` and `diversity_statistics.R`. They would fail on any machine but yours, and on Snakemake they fail outright.
+2. **Let each script take its file paths as arguments** (`commandArgs`) instead of reading fixed filenames. That is roughly three lines per script, and it also removes the duplicate copies of `mammoth_aligned.fasta` and the accessions CSV that currently sit in several folders.
+3. **Add the R packages to `environment.yml`.** It currently lists only `mafft`. It needs `r-base`, `r-ape`, `r-phangorn` and `r-seqinr`, so conda can build the whole environment. You'll have to decide what to do with `renv`. Keeping both is redundant, but removing it is your call.
+4. **Fix the `optINv` typo** in `mammoth_tree.R`. R is case-sensitive, so the invariant-sites option is probably being ignored. That means the tree's invariant-site parameter may not have been optimized, so re-run the tree and check whether the tree and the numbers I gave you for the paper change.
+
+### The check that matters
+After the refactor, run the Snakemake pipeline from scratch and confirm the outputs match your committed results (π, S, haplotype counts, and the p-value, since the seed is fixed at 2026). That's your proof the wrapper didn't change the science.
+
+I'd suggest doing the refactor one script at a time, with a terminal walkthrough for each. Do you want to start with step 1, removing `setwd` and adding arguments to the first script?
+
+- **What I asked next:** "Yes"
+
+### Step 1: Make a safe branch and save a "before" snapshot
+
+**Why:** Refactoring means editing scripts that already produced your results. Before touching anything, we do two things:
+1. Work on a **branch**, so `main` keeps your finished, working analysis.
+2. Record a **checksum** of every result file. A checksum is a fingerprint of a file, so if the Snakemake run later produces a file with the same fingerprint, it's byte-for-byte identical. That's our proof the wrapper didn't change the science.
+
+Run these in **WSL (Ubuntu)**, in your mammoth repo folder:
+
+```bash
+cd "/mnt/c/Users/nelin/Desktop/GWU Information/GWU Fall 2026/Princip_Bioinformatics/mammoth_mitogenome_pubh6860"
+git status
+```
+
+`git status` should say your working tree is clean. If it lists changes, commit them first. If your repo lives in the OneDrive path from `diversity_statistics.R`, `cd` there instead.
+
+```bash
+git checkout -b snakemake-workflow
+```
+
+This creates the branch and switches to it.
+
+```bash
+mkdir -p docs
+sha256sum alignment/mammoth_aligned.fasta \
+          model_and_tree/mammoth_model_select_sorted_results.csv \
+          model_and_tree/mammoth_tree.nwk \
+          diversity_stats/diversity_stats_by_group.csv \
+          diversity_stats/permutation_test_results.csv \
+          diversity_stats/subsample_results.csv \
+          > docs/results_checksums_before_snakemake.txt
+cat docs/results_checksums_before_snakemake.txt
+```
+
+You should see 6 lines, each a long hex string followed by a file name.
+
+**Expect some mismatches later, and that's fine.** The tree depends on the `optINv` typo, so `mammoth_tree.nwk` will probably change once we fix it. MAFFT output can also differ slightly between versions. The diversity and permutation files should match exactly, because the seed is fixed. We'll explain any difference when it happens, not hide it.
+
+```bash
+git add docs/results_checksums_before_snakemake.txt
+git commit -m "Add checksums of results before Snakemake refactor"
+```
+
+### Step 2: Refactor the first script (`mafft_mammoth_verify.R`)
+
+This is the smallest script, so it's the best place to learn the pattern.
+
+**Why it needs to change.** Right now it has two problems:
+- `setwd("C:/Users/nelin/...")` only exists on your computer. Anyone else, or Snakemake in a clean environment, would get an error.
+- The file name `mammoth_aligned.fasta` is typed into the script. Snakemake needs to *tell* the script which file to read.
+
+**The pattern.** R can accept arguments from the command line with `commandArgs()`. When Snakemake runs `Rscript alignment/mafft_mammoth_verify.R alignment/mammoth_aligned.fasta`, the script receives that path itself.
+
+Replace the whole file with this:
+
+```r
+# Verify the MAFFT alignment: 42 sequences, all the same length.
+# Usage: Rscript mafft_mammoth_verify.R <aligned_fasta>
+library(seqinr)
+
+args <- commandArgs(trailingOnly = TRUE)
+# Use the given path, or fall back to the default so you can still run this by hand
+aln_file <- if (length(args) >= 1) args[1] else "alignment/mammoth_aligned.fasta"
+
+aln <- read.alignment(aln_file, format = "fasta")
+
+cat("Number of sequences:", length(aln$seq), "\n")
+lengths <- sapply(aln$seq, nchar)
+cat("Length of first sequence:", lengths[1], "\n")
+cat("All sequences equal length:", all(lengths == lengths[1]), "\n")
+```
+
+What changed and why:
+- **`setwd` is gone.** The script now takes paths from wherever you run it, which is the repo's top folder. That's also how Snakemake runs it.
+- **`commandArgs(trailingOnly = TRUE)`** collects only the arguments you typed after the script name.
+- **The fallback path** keeps the script usable by hand from the repo root.
+- **`cat()` replaces bare expressions.** In RStudio, typing `length(aln$seq)` prints the result. In a script run by `Rscript`, it prints nothing. `cat()` makes the output appear, and Snakemake saves it into `alignment/alignment_check.txt`.
+
+### Step 3: Test it from the terminal
+
+```bash
+conda install -c conda-forge r-seqinr    # skip if R and seqinr already work in WSL
+Rscript alignment/mafft_mammoth_verify.R alignment/mammoth_aligned.fasta
+```
+
+**Expected output:**
+```
+Number of sequences: 42
+Length of first sequence: 16905
+All sequences equal length: TRUE
+```
+
+Those are the same three numbers you checked originally (42, 16905, TRUE). If you get an error such as `Rscript: command not found`, paste it and we'll fix it. R may only be installed on the Windows side, and I'd rather sort that out now than later.
+
+```bash
+git add alignment/mafft_mammoth_verify.R
+git commit -m "Make verify script path-independent (commandArgs, no setwd)"
+```
+
+Paste the Step 1 output (the six checksum lines) and the Step 3 output when you have them. If both look right, we'll refactor `mammoth_sub_model_select.R` next, which has the same pattern plus two output files.
+- **Verification:**
