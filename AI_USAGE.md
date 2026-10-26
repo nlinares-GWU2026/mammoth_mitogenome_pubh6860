@@ -988,4 +988,90 @@ git commit -m "Make model selection script path-independent"
 ```
 
 Don't commit the regenerated `.rds` and `.csv` yet; we'll decide that after you paste the comparison. Please send the last 15 lines of the console output and the `git diff` result.
+- **What I asked next:** (pasted the output)
+- **Exact output (verbatim):**
+Both winning models are the same as your original run, which is the most important check. The model table itself isn't confirmed yet, because the diff we have is incomplete:
+
+- **Same winners:** AIC picks HKY+G(4)+I and BIC picks HKY+I, exactly as in your committed results. Your original AIC for HKY+G(4)+I was 53211.25, logLik −26518.627, which also matches what's in my notes.
+- **The diff is incomplete.** `head -30` cut it off after the first 30 lines, so we saw only the old rows (the `-` lines) and none of the new ones (`+`). I can't yet say whether any numbers changed.
+- **All 93 rows show as changed**, even though the winning models match. That usually means the line endings changed, not the numbers. Windows R writes CSVs with Windows-style line endings and Linux R writes Unix-style ones, so every line looks different to git while the content is identical. We'll test that below.
+- **`.rds` changed** (305066 → 303941 bytes). That's expected, as explained earlier.
+- **`diff --stat` vs `git diff --stat`.** The first one was plain `diff` (a different command), so it errored. It's an easy slip, and the `git diff --stat` you ran after it worked.
+
+### Step 7b: Test whether only line endings changed
+```bash
+git diff --ignore-cr-at-eol --stat -- model_and_tree/mammoth_model_select_sorted_results.csv
+```
+
+- **Prints nothing:** the content is identical and only line endings differ. This is a perfect reproduction.
+- **Prints a line or two:** some numbers differ. Go to the next command.
+
+### Step 7c: If numbers differ, measure by how much
+```bash
+git show HEAD:model_and_tree/mammoth_model_select_sorted_results.csv > /tmp/old_model.csv
+Rscript --no-init-file -e 'o <- read.csv("/tmp/old_model.csv"); n <- read.csv("model_and_tree/mammoth_model_select_sorted_results.csv"); cat("same ranking:", identical(o$Model, n$Model), "\n"); m <- merge(o, n, by = "Model"); cat("max abs AIC diff:", max(abs(m$AIC.x - m$AIC.y)), "\n"); cat("max abs logLik diff:", max(abs(m$logLik.x - m$logLik.y)), "\n")'
+```
+
+Run both; 7c is only needed if 7b prints something. What I'm looking for:
+- `same ranking: TRUE` means all 92 models are in the same order.
+- Differences below about 0.01 in AIC and logLik are rounding-level and fine. Anything larger we should investigate.
+
+## Step 8: Commit
+Once 7b or 7c looks fine, commit only the script and keep the regenerated results:
+
+```bash
+git add model_and_tree/mammoth_sub_model_select.R model_and_tree/mammoth_model_select_sorted_results.csv model_and_tree/mammoth_model_select_results.rds
+git commit -m "Refactor model selection script; re-run under conda R 4.5.3 reproduces AIC/BIC winners"
+```
+
+Your `AI_USAGE.md` and `notes.md` changes are separate, so commit them on their own:
+
+```bash
+git add AI_USAGE.md notes.md
+git commit -m "Update AI usage log and notes"
+```
+
+If 7b prints nothing, send me just that, and next we'll refactor the tree script. That one also contains the `optINv` typo, so we'll be able to see exactly what that typo did.
+- **What I asked next:** (pasted the output)
+- **Exact output (verbatim):**
+The blank screen with `(END)` is Git's pager (a viewer called `less`). It opens whenever Git prints output. Here the output was empty, which is the "prints nothing" result I was hoping for.
+
+**That means the CSV content is identical.** Once line endings are ignored, there is no difference between your original Windows run and the new conda R 4.5.3 run. All 92 model scores match, and the model-selection step reproduced exactly.
+
+### Step 7d: Leave the pager
+Press **`q`** to get your prompt back. It's the same key for any `less` screen.
+
+Optionally, you can stop Git from using the pager for short outputs:
+```bash
+git config --global core.pager "less -FRX"
+```
+The `-F` flag makes `less` exit on its own when the output fits on one screen, so you won't get stuck on blank screens like this one.
+
+### Step 8: Commit
+Run the commit from last time:
+
+```bash
+git add model_and_tree/mammoth_sub_model_select.R model_and_tree/mammoth_model_select_sorted_results.csv model_and_tree/mammoth_model_select_results.rds
+git commit -m "Refactor model selection script; re-run under conda R 4.5.3 reproduces AIC/BIC winners"
+git add AI_USAGE.md notes.md
+git commit -m "Update AI usage log and notes"
+```
+
+Then check that you're clean:
+```bash
+git status
+git log --oneline -5
+```
+
+`git status` should say `nothing to commit, working tree clean`. Paste the `git log` lines if you want me to check them.
+
+**One thing to decide before the next step:** the CSV now has Unix line endings instead of Windows ones. That's harmless, but if you ever edit these files on Windows again, git may warn about line endings. It won't affect results, and I'll fold a one-line `.gitattributes` fix into a later step.
+
+### Next: the tree script
+This is the most interesting one, for three reasons:
+1. It has **two** `setwd` lines (one points to a different folder, so it's a leftover).
+2. It makes the plot and writes `mammoth_tree.nwk`.
+3. It contains the **`optINv` typo**. R is case-sensitive, so R probably ignored that option. Fixing it may change the tree and the log-likelihood.
+
+I'll send the refactored version once you've confirmed the commits went through. Before running it, please paste what the original tree run printed for `fit_ml`, if you still have it. It lists logLik, the gamma shape, the proportion of invariant sites and kappa. If you don't have it, don't worry: the new run will produce it, and we'll compare it with the committed tree.
 - **Verification:**
