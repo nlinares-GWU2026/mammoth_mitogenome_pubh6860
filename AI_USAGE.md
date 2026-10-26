@@ -892,4 +892,100 @@ git commit -m "Make verify script path-independent (commandArgs, no setwd)"
 ```
 
 Paste the Step 1 output (the six checksum lines) and the Step 3 output when you have them. If both look right, we'll refactor `mammoth_sub_model_select.R` next, which has the same pattern plus two output files.
+- **What I asked next:** (pasted the output)
+- **Exact output (verbatim):**
+It passed with the three expected lines, so the verify script now runs from the terminal with no `setwd`, and conda supplies R, the packages and Snakemake.
+
+**One thing to note for the paper:** conda gave you R **4.5.3**, while your original analysis ran in Windows R **4.6.1**. The Snakemake run will use 4.5.3, so it may differ in a decimal place from your original results. That's why we compare against the checksums. If a result differs, we'll find out whether it's R, a package version or a real problem, and the Methods will say which R version produced the final numbers.
+
+### Step 4: Commit what's working
+```bash
+git add environment.yml alignment/mafft_mammoth_verify.R
+git commit -m "Add R, R packages and snakemake to conda env; path-independent verify script"
+```
+
+### Step 5: Refactor `mammoth_sub_model_select.R`
+This is the same pattern as before, with three changes:
+- The input file is passed in.
+- There are **two** outputs, so there are three arguments in total: the aligned FASTA, the `.rds` file and the `.csv` file.
+- The best model is printed with `cat()`, so Snakemake's log records it.
+
+Your comments and logic stay intact. Replace the whole file with this:
+
+```r
+# Choosing Substitution Model to see which describes how these 42 mitogenomes actually evolved
+# Usage: Rscript --no-init-file mammoth_sub_model_select.R <aligned_fasta> <out_rds> <out_csv>
+
+library(ape)
+library(phangorn) # has own data structure "phyDat" separate from seqinr alignment object used in "...verify.R"
+
+args <- commandArgs(trailingOnly = TRUE)
+aln_file <- if (length(args) >= 1) args[1] else "alignment/mammoth_aligned.fasta"
+out_rds  <- if (length(args) >= 2) args[2] else "model_and_tree/mammoth_model_select_results.rds"
+out_csv  <- if (length(args) >= 3) args[3] else "model_and_tree/mammoth_model_select_sorted_results.csv"
+
+# can read the aligned FASTA file directly, no conversion needed
+mammoth_phydat <- read.phyDat(aln_file, format = "fasta", type = "DNA")
+
+# Checking that every sequence came through the phyDat conversion
+cat("Sequences in phyDat object:", length(mammoth_phydat), "(expect 42)\n")
+
+### Model Testing
+# Fitting series of substitution models to the alignment, from the simplest
+# to the more complex but realistic ones with unequal base freqs, ts/tv bias, and rate variation across sites
+mt <- modelTest(mammoth_phydat)
+# Save result
+saveRDS(mt, out_rds)
+
+### ID the best fitting model
+# Sort by AIC first, since mitochondrial DNA has almost always real rate variation and real invariant sites
+# and due to the large dataset, the BIC's harsh penalty would exclude those biological features and count them
+# as statistical noise. Building a tree off of a model that assumes a more simple model than reality can risk underestimating
+# genetic divergence between more distantly related samples. If AIC and BIC match, then extra confidence, if not, then sorting by
+# AIC was because of the above justification.
+sorted <- mt[order(mt$AIC), ]
+print(head(sorted, 10))
+cat("Best model by AIC:", sorted$Model[1], "\n")
+cat("Best model by BIC:", mt$Model[which.min(mt$BIC)], "\n")
+write.csv(sorted, file = out_csv, row.names = FALSE)
+```
+
+What changed and why:
+- **Three paths come from `args`**, each with a fallback so you can still run it by hand from the repo's top folder.
+- **`print(head(sorted, 10))`** is used because bare expressions don't print under `Rscript`.
+- **The two `cat("Best model...")` lines** put your AIC and BIC choices in the log. The AIC line is the one the tree depends on.
+
+## Step 6: Run it
+This re-runs `modelTest` from scratch, which took several minutes the first time. It overwrites your committed `.rds` and `.csv` on this branch, which is intended, because git will then show us any difference.
+
+```bash
+Rscript --no-init-file model_and_tree/mammoth_sub_model_select.R \
+  alignment/mammoth_aligned.fasta \
+  model_and_tree/mammoth_model_select_results.rds \
+  model_and_tree/mammoth_model_select_sorted_results.csv
+```
+
+The backslashes just split one long command over several lines. Wait for the prompt to come back, and expect these last lines:
+```
+Best model by AIC: HKY+G(4)+I
+Best model by BIC: HKY+I
+```
+
+### Step 7: Compare to your original results
+```bash
+git diff --stat
+git diff model_and_tree/mammoth_model_select_sorted_results.csv | head -30
+```
+
+- **No diff on the CSV:** the new run reproduced your original model table exactly. This is the best case.
+- **Tiny differences in the last digits of logLik or AIC:** these are normal when R or package versions differ. Check that the model ranking and the winner are the same.
+- **A different winning model:** this would matter, so paste it and we'll investigate before going further.
+- The **`.rds` will always show as changed**, because it stores an R environment that differs byte-for-byte on every save. Ignore it and compare the CSV.
+
+```bash
+git add model_and_tree/mammoth_sub_model_select.R
+git commit -m "Make model selection script path-independent"
+```
+
+Don't commit the regenerated `.rds` and `.csv` yet; we'll decide that after you paste the comparison. Please send the last 15 lines of the console output and the `git diff` result.
 - **Verification:**

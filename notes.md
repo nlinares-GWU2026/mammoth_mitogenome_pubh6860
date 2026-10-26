@@ -25,4 +25,4 @@ The plot has 4-5 separate humps, not one bell curve. The humps come from the 4 a
 These results come from mitochondrial genome only, which is a single non-recombining locus.
 Result supports "Diversity collapsed after isolation." Not "Low diversity caused extinction." 
 ## Current: 
-12. Implementing Snakemake for reproducibility
+12. Implementing Snakemake for reproducibility. So far, the only issue run into was that conda gave me R version 4.5.3 while my analysis was run on R version (Windows) 4.6.1. The Snakemake run will use 4.5.3 so it may differ in a decimal place from original results. Methods will say which R version produced the final numbers. 
