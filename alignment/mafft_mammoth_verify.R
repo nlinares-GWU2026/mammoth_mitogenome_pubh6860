@@ -1,9 +1,15 @@
+# Verify the MAFFT alginment: 42 sequences, all the same length.
+# Usage: Rscript mafft_mammoth_verify.R <aligned_fasta>
+
 library(seqinr)
 
-setwd("C:/Users/nelin/Desktop/GWU Information/GWU Fall 2026/Princip_Bioinformatics/mammoth_mitogenome_pubh6860/alignment")
-aln <- read.alignment("mammoth_aligned.fasta", format = "fasta")
+args <- commandArgs(trailingOnly = TRUE)
+# Use the given path, or fall back to the default so you can still run this by hand
+aln_file <- if (length(args) >= 1) args[1] else "alignment/mammoth_aligned.fasta"
 
-length(aln$seq)
+aln <- read.alignment(aln_file, format = "fasta")
+
+cat("Number of sequences:", length(aln$seq), "\n")
 lengths <- sapply(aln$seq, nchar)
-lengths[1]
-all(lengths == lengths[1])
+cat("Length of first sequence:", lengths[1], "\n")
+cat("All sequences equal length:", all(lengths == lengths[1]), "\n")

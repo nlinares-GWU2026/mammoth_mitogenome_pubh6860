@@ -5,3 +5,8 @@ channels:
   - nodefaults
 dependencies:
   - mafft=7.525
+  - r-base
+  - r-ape
+  - r-phangorn
+  - r-seqinr
+  - snakemake
