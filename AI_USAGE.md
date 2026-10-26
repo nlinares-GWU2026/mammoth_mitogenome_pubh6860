@@ -1743,7 +1743,7 @@ write.csv(subsample_summary, out_subsample, row.names = FALSE)
 
 One note on `set.seed(2026)`: R's random-number generator is the same in 4.5.3 and 4.6.1, so a fixed seed should give identical draws. The permutation p-values sit at the minimum possible value (about 0.0001) and are insensitive to the draws. The subsample medians and intervals are the numbers that would show any difference.
 
-## Step 19: Run it and compare
+### Step 19: Run it and compare
 It runs 10,000 shuffles three times, so give it a few minutes:
 
 ```bash
@@ -1764,4 +1764,79 @@ git commit -m "Refactor hypothesis test script: path-independent, same seeds and
 ```
 
 If everything matches, all seven scripts are refactored and verified. The last step is the real **Snakefile**, where we link them together and run the whole pipeline from a clean start.
-- **Verification:**
+- **What I asked next:** (pasted the final output of the script that matched original numbers as well, asked to move onto the Snakefile)
+- **Exact output (verbatim):**
+All seven scripts now reproduce your original results exactly. Every printed value matched its "(expect …)" tag, including π, S, Hd, the permutation results and the subsample table, and both CSV diffs were empty. The random-number seed gave identical draws under R 4.5.3, so the Windows-to-WSL switch changed nothing in the statistics.
+
+### Step 20: Commit the last script
+```bash
+git add diversity_stats/hypothesis_test.R diversity_stats/permutation_test_all.pdf
+git commit -m "Refactor hypothesis test script: path-independent, same seeds and RNG order"
+```
+
+### Step 21: Add the Snakefile
+Save the attached file as **`Snakefile`** in the repo's top folder, next to `environment.yml`. The name has no extension, so if your download came out as `Snakefile.txt`, rename it. Tell me if the download is awkward and I'll paste the text.
+
+**What's in it:**
+- **One rule per step.** Each rule has inputs, outputs and the command to run. For example, `align` turns the downloaded FASTA into the aligned FASTA.
+- **Snakemake works out the order itself.** It sees that `tree` needs the model-selection output, so it runs that first.
+- **Only out-of-date steps re-run.** If you change only the hypothesis test, the slow tree step is skipped.
+- **Each rule writes a log.** Console output goes to `logs/<rule>.log`, which is your record of the fitted-model numbers.
+- **`fetch_sequences` fails loudly** unless exactly 42 records come back from GenBank. That's the "42 in" check from your proposal.
+- **`rule all`** lists the final files, and asking for it builds everything.
+
+I dry-ran this exact file against a copy of your repo layout. All nine jobs were scheduled, and every command expanded to the right paths and arguments. I couldn't run the real analysis here, since R and MAFFT aren't installed in my workspace, so your run is the first full test.
+
+### Step 22: Keep the logs in Git
+Your `.gitignore` blocks `*.log`, which would hide the logs. Add an exception:
+
+```bash
+echo '!logs/*.log' >> .gitignore
+echo '.snakemake/' >> .gitignore
+```
+
+The second line keeps Snakemake's own bookkeeping folder out of the repo.
+
+### Step 23: Dry run
+This only shows what would run. Nothing is executed.
+
+```bash
+conda activate mammoth-project
+snakemake -n -p
+```
+
+Everything is already up to date from your manual runs, so it should say `Nothing to be done`. Now force a full plan:
+
+```bash
+snakemake -n -p --forceall
+```
+
+You should see 9 jobs: fetch_sequences, align, verify_alignment, model_select, tree, time_bin, diversity_stats, hypothesis_test and all. Check that no red errors appear. If it complains about a missing file, paste the message.
+
+## Step 24: The real test, rebuilding from scratch
+This is the test your project needs. It re-downloads the sequences from NCBI, re-aligns them and re-runs every analysis, so it proves the pipeline works from raw data. It takes a while, mostly the model-selection and tree steps. Start it and leave it running.
+
+First, make sure everything is committed (`git status` should be clean apart from the `Snakefile`), so you can compare afterward:
+
+```bash
+git add Snakefile .gitignore
+git commit -m "Add Snakemake workflow"
+snakemake --cores 4 --forceall 2>&1 | tail -40
+```
+
+When it finishes, you should see `9 of 9 steps (100%) done`. Then see what changed compared with your committed results:
+
+```bash
+git status
+git diff --ignore-cr-at-eol --stat
+sha256sum -c docs/results_checksums_before_snakemake.txt
+```
+
+**What to expect:**
+- **`mammoth_aligned.fasta`:** `OK` on the checksum if MAFFT reproduces the alignment byte for byte. MAFFT 7.525 is pinned, so I expect that.
+- **The other CSVs:** no differences, as in your step-by-step runs.
+- **The tree and model files** will show as FAILED on the old checksum list. That's expected, since the tree was regenerated and its checksum was recorded before the `optInv` fix.
+- **The downloaded FASTA** (`mammoth_mitogenomes.fasta`) should be unchanged. If NCBI has updated any of the 42 records since you downloaded them, it would differ, so a difference there would be worth knowing about.
+
+Paste the `tail -40` output and the three results.
+- **Verification:** I ran each and every code as directed, retyped every script or file sent, understood the changes and the process, and ensured the final output was correct and logical.
