@@ -955,7 +955,7 @@ What changed and why:
 - **`print(head(sorted, 10))`** is used because bare expressions don't print under `Rscript`.
 - **The two `cat("Best model...")` lines** put your AIC and BIC choices in the log. The AIC line is the one the tree depends on.
 
-## Step 6: Run it
+### Step 6: Run it
 This re-runs `modelTest` from scratch, which took several minutes the first time. It overwrites your committed `.rds` and `.csv` on this branch, which is intended, because git will then show us any difference.
 
 ```bash
@@ -1016,7 +1016,7 @@ Run both; 7c is only needed if 7b prints something. What I'm looking for:
 - `same ranking: TRUE` means all 92 models are in the same order.
 - Differences below about 0.01 in AIC and logLik are rounding-level and fine. Anything larger we should investigate.
 
-## Step 8: Commit
+### Step 8: Commit
 Once 7b or 7c looks fine, commit only the script and keep the regenerated results:
 
 ```bash
@@ -1264,4 +1264,292 @@ How to read it:
 - **Hold the new `.nwk` and `.pdf`** until the Step 12 result is in. Then we commit them together with a note explaining the difference.
 
 Paste the Step 12 output and we'll decide about the tree. After that we refactor `time_binning.R`, which should be quick.
+- **What I asked next:** (pasted output of result that showed error label mismatch and showed that 37 splits are common with Robinson-Foulds value of 6 which means mostly identical)
+- **Exact output (verbatim):** 
+Two things happened.
+
+**1. The error is a label mismatch, not a problem with your trees.** Your alignment's sequence names are the full FASTA headers (accession plus description), but the labels read back from the saved Newick file are written differently, for example with spaces swapped for underscores. `pml()` needs the two to match exactly. The fix is to relabel the tree tips by accession number, which is the same trick your own scripts use.
+
+**2. `comparePhylo` did give us one useful number.** It reported **37 splits in common**, out of 40, so each tree has 3 splits the other lacks. That fits the Robinson-Foulds value of 6 and confirms the trees are 92% identical in structure. It didn't print *which* splits differ, so the new script below does.
+
+### Step 12 (retry)
+Save the script to a temporary file first. A multi-line script inside quotes breaks easily in the terminal:
+
+```bash
+cat > /tmp/tree_compare.R <<'EOF'
+suppressMessages(library(phangorn))
+acc <- function(x) sub("[ _.].*$", "", x)   # accession = text before first space, underscore or dot
+
+meta <- read.csv("data_aquisition/mammoth_mitogenome_accessions.csv")
+o <- read.tree("/tmp/old_tree.nwk")
+n <- read.tree("model_and_tree/mammoth_tree.nwk")
+aln <- read.phyDat("alignment/mammoth_aligned.fasta", format = "fasta", type = "DNA")
+
+# Relabel tips of both trees to exactly match the alignment's sequence names
+fix <- function(tr) {
+  tr$tip.label <- names(aln)[match(acc(tr$tip.label), acc(names(aln)))]
+  stopifnot(!anyNA(tr$tip.label))
+  tr
+}
+o <- fix(o); n <- fix(n)
+
+# Which groups of tips differ? Root both trees on the same tip so splits are comparable
+lab <- function(x) meta$Lab_ID[match(acc(x), meta$Accession_No)]
+clades <- function(tr) {
+  tr <- root(tr, outgroup = names(aln)[1], resolve.root = TRUE)
+  pp <- prop.part(tr)
+  sapply(pp, function(ix) paste(sort(lab(attr(pp, "labels")[ix])), collapse = ", "))
+}
+co <- clades(o); cn <- clades(n)
+cat("\n--- Groups present only in the OLD tree ---\n"); print(setdiff(co, cn))
+cat("\n--- Groups present only in the NEW tree ---\n"); print(setdiff(cn, co))
+
+# Likelihood of the old topology under the same model
+fit_o <- pml(o, aln, model = "HKY", k = 4, shape = 0.99, inv = 0.85)
+fit_o <- optim.pml(fit_o, model = "HKY", optGamma = TRUE, optInv = TRUE, optEdge = TRUE)
+cat("\nOld topology logLik:", fit_o$logLik, "\nNew topology logLik: -26516.91\n")
+EOF
+Rscript --no-init-file /tmp/tree_compare.R 2>&1 | tail -40
+```
+
+`cat > file <<'EOF' ... EOF` writes everything between the two `EOF` lines into the file. The quotes around `'EOF'` stop the terminal from interpreting the contents.
+
+**What you'll see:**
+- **Two lists of tip groups**, one per tree. Compare them. If the differing groups are Wrangel samples that share haplotypes (several W1 or W4 samples), that's the "identical sequences, arbitrary order" explanation. If a group involves P011 or other pre-bottleneck samples, tell me, because that matters for your story.
+- **Two log-likelihoods.** If the old topology scores within about 1–2 units of −26516.91, the data can't tell the trees apart.
+
+### Housekeeping
+Your last `git add` staged `mammoth_tree.R`, but a commit is still needed:
+
+```bash
+git commit -m "Refactor tree script: path-independent, optInv fixed, PDF output"
+```
+
+Paste the output and we'll decide about the new tree files.
+- **What I asked next:** 
+The two trees fit the data equally well, so the topology difference doesn't matter for your results. Here is what the output shows.
+
+### What the comparison says
+- **Likelihoods:** the old topology scores −26516.90 and the new one −26516.91. A 0.01 difference is well inside optimization noise, so the data can't tell them apart. For comparison, I'd only start to worry at about 2 or more.
+- **Which tips differ:** nearly all the differing groups involve the same two sets of samples.
+  - **Wrangel samples** shuffling their branching order among themselves: M26, M28, L468, E460, L386 and L459. Wrangel mammoths share a few haplotypes and differ at only 6 sites in total, so there is little data to fix their order.
+  - **Four Siberian samples** swapping close neighbors: Krause, L164, GilbertM13 and GilbertM15 (the `{Krause, L164}` and `{GilbertM13, GilbertM15, Krause}` groups).
+- **P011 is absent from every list.** As far as these lists show, its position relative to the Wrangel group didn't change. This matches what you noticed earlier, so your decision to keep it as pre-bottleneck still stands.
+- **Why it doesn't affect your main results:** π, S and haplotype diversity are computed from the *alignment*, not the tree. The tree is a sanity check and a figure.
+
+### Step 13: Commit the new tree
+Since the pipeline will regenerate this tree anyway, I recommend committing the new one so the repo and the Snakemake output agree. Use the new PDF in your paper's figure as well, so the figure matches the repo.
+
+```bash
+git add model_and_tree/mammoth_tree.nwk model_and_tree/mammoth_tree_plot.pdf
+git commit -m "Regenerate tree under conda R 4.5.3 with optInv fixed (logLik -26516.91; RF=6 vs previous, equal likelihood)"
+```
+
+Then open the new PDF and check the same things as before: the Wrangel samples cluster together and the four outliers sit on long branches. Tell me if anything looks different.
+
+Your first commit (`a20d3b5`) did go through. The second `git commit` in your paste said "nothing to commit", which is harmless since it was already done.
+
+### Step 14: Refactor `time_binning.R`
+This script is simple. The changes are the same pattern as before, with five arguments: the aligned FASTA, the metadata CSV and three output files.
+
+Replace the file with:
+
+```r
+# Time binning - Splitting into Pre-/Post-Bottleneck Groups using already established
+# sample metadata. Split the ALIGNED sequences themselves into two subsets to be ready
+# for diversity statistics because diversity stats are computed on actual sequence alignment,
+# not column or tree data.
+# Usage: Rscript --no-init-file time_binning.R <aligned_fasta> <metadata_csv> <out_rds> <out_post_fasta> <out_pre_fasta>
+
+library(ape)
+
+args <- commandArgs(trailingOnly = TRUE)
+aln_file  <- if (length(args) >= 1) args[1] else "alignment/mammoth_aligned.fasta"
+meta_csv  <- if (length(args) >= 2) args[2] else "data_aquisition/mammoth_mitogenome_accessions.csv"
+out_rds   <- if (length(args) >= 3) args[3] else "diversity_stats/time_binned_alignments.rds"
+out_post  <- if (length(args) >= 4) args[4] else "diversity_stats/post_bottleneck_aligned.fasta"
+out_pre   <- if (length(args) >= 5) args[5] else "diversity_stats/pre_bottleneck_aligned.fasta"
+
+# Load alignment as DNAbin object (ape's compact binary format for DNA seqs)
+mammoth_dna <- read.dna(aln_file, format = "fasta")
+cat("Alignment dimensions (sequences x bp):", dim(mammoth_dna), "(expect 42 x 16905)\n")
+
+# Match each sequence to its pre-/post-bottleneck group
+metadata <- read.csv(meta_csv)
+
+# Sequence names are still in "ACCESSION.version" form -> strip version suffix to match Accession_No.
+seq_accessions <- sub("\\..*$", "", rownames(mammoth_dna))
+seq_groups <- metadata$Group[match(seq_accessions, metadata$Accession_No)]
+
+# Confirm every seq matched to a group (either pre- or post- with 3 labels) - no NA entries
+print(table(seq_groups, useNA = "ifany")) # Expect that 6 pre-bottleneck are undated but still classified as pre-bottleneck
+stopifnot(!anyNA(seq_groups))
+
+# Collapse 3 labels into two-level group variable
+# grepl("^Post") catches the Post group; everything else (dated and undated) is Pre
+seq_groups_clean <- ifelse(grepl("^Post", seq_groups), "Post-bottleneck", "Pre-bottleneck")
+print(table(seq_groups_clean, useNA = "ifany"))
+
+# Split into 2 DNAbin subsets
+post_bottleneck <- mammoth_dna[seq_groups_clean == "Post-bottleneck", ]
+pre_bottleneck  <- mammoth_dna[seq_groups_clean == "Pre-bottleneck", ]
+cat("Post:", nrow(post_bottleneck), "sequences (expect 14); Pre:", nrow(pre_bottleneck), "sequences (expect 28)\n")
+stopifnot(nrow(post_bottleneck) == 14, nrow(pre_bottleneck) == 28)
+
+# Save FASTA files of info for diversity stats
+write.dna(post_bottleneck, out_post, format = "fasta")
+write.dna(pre_bottleneck, out_pre, format = "fasta")
+# Save as a single RDS file so diversity stats script can load both DNAbin objs without re-parsing FASTA
+saveRDS(list(post = post_bottleneck, pre = pre_bottleneck), out_rds)
+```
+
+Two additions: `stopifnot()` checks stop the pipeline loudly if a sample goes missing or the 14/28 split is wrong, which fits your "42 in, 42 out" validation plan.
+
+### Step 15: Run it and compare to the original
+```bash
+git show HEAD:diversity_stats/time_binned_alignments.rds > /tmp/old_binned.rds
+Rscript --no-init-file diversity_stats/time_binning.R \
+  alignment/mammoth_aligned.fasta \
+  data_aquisition/mammoth_mitogenome_accessions.csv \
+  diversity_stats/time_binned_alignments.rds \
+  diversity_stats/post_bottleneck_aligned.fasta \
+  diversity_stats/pre_bottleneck_aligned.fasta
+Rscript --no-init-file -e 'cat("RDS identical to original:", identical(readRDS("/tmp/old_binned.rds"), readRDS("diversity_stats/time_binned_alignments.rds")), "\n")'
+git diff --ignore-cr-at-eol --stat -- diversity_stats/*.fasta
+```
+
+Expected: the table shows 14 / 22 / 6 and 14 / 28, then `RDS identical to original: TRUE`, and the last command prints nothing (the FASTA files are unchanged apart from line endings). If it's different, paste it.
+
+Then commit the script:
+```bash
+git add diversity_stats/time_binning.R
+git commit -m "Refactor time binning script: path-independent with sanity checks"
+```
+
+If this passes, the last two scripts (diversity statistics and the hypothesis test) are the long ones, and after them we write the real Snakefile.
+- **What I asked next:** (pasted the output, everything passed)
+- **Exact output (verbatim):** 
+ Every check passed: 42 × 16,905, the 14 / 22 / 6 split, the RDS **identical** to your original (`TRUE`), the FASTA diff empty, and the commit is in. The time-binning step reproduces your original files exactly.
+
+### Step 16: Refactor `diversity_statistics.R`
+This is the script that produces your headline numbers (π, S, Hd), so it matters most that it reproduces exactly.
+
+Changes:
+- **`setwd` is removed.** This one pointed at your OneDrive folder, a different path from the others.
+- **There are three arguments:** the binned `.rds`, the main output CSV and a new second CSV.
+- **The pairwise-deletion check is now saved** to that second CSV. Before, it only printed to the console, and you cite those numbers in the paper (Post 0.000405, Pre 0.004529). Saving it means the pipeline produces them too.
+- **Printing uses `print()` and `cat()`,** since bare expressions print nothing under `Rscript`.
+
+All the calculation logic is exactly as you wrote it. Replace the file with this:
+
+```r
+# Diversity Statistics by Group
+# To quantify genetic diversity in the post-bottleneck and pre-bottleneck groups using: Nucleotide Diversity (pi), Segregating Sites (S), and Haplotype Diversity (Hd)
+# Calculated with ape and R rather than a population genetics package so every number is traceable to a line of code
+# Usage: Rscript --no-init-file diversity_statistics.R <binned_rds> <out_csv> <out_pairwise_csv>
+
+library(ape)
+
+args <- commandArgs(trailingOnly = TRUE)
+in_rds       <- if (length(args) >= 1) args[1] else "diversity_stats/time_binned_alignments.rds"
+out_csv      <- if (length(args) >= 2) args[2] else "diversity_stats/diversity_stats_by_group.csv"
+out_pairwise <- if (length(args) >= 3) args[3] else "diversity_stats/diversity_pairwise_deletion.csv"
+
+# Load both group alignments from `time_binning.R`
+binned <- readRDS(in_rds)
+post <- binned$post # 14
+pre <- binned$pre # 28
+
+# Choose sites the groups will be compared on
+# Because alignment contains gaps and N's, keep only alignment columns where ALL 42 seqs have a real base.
+# Using same set of columns for both groups is necessesary because using trimmed lengths would be comparing different stretches of genome
+all_dna <- rbind(post, pre) # Stacking into single matrix with 42 seqs
+all_chars <- as.character(all_dna) # Matrix of single letters
+# Scans through matrix column by column (2 = apply cross columns) to filter clean data by:
+# Checking if every base in that single column is a real, unambiguous char
+# Returns TRUE only if every single one of the 42 samples has a real base
+# Stores as a true/false vector
+callable <- apply(all_chars, 2, function(col) all(col %in% c("a", "c", "g", "t")))
+
+# How many of the 16,905 alignment columns persist through filtering?
+cat("Callable sites:", sum(callable), "of", length(callable), "(expect 11153)\n")
+cat("Proportion callable:", mean(callable), "(expect 0.6597456)\n")
+
+# Converts the 14 post and pre seqs into a text matrix where each row is a sample and each column is a genomic base
+# Trims the columns of this matrix keeping only those columns where callable = TRUE
+post_sites <- as.character(post)[, callable]
+pre_sites <- as.character(pre)[, callable]
+
+##### FUNCTION FOR ALL 3 DIVERSITY STATS #####
+diversity_stats <- function(char_mat) {
+  n <- nrow(char_mat)
+
+  # Nucleotide Diversity (pi): avg pairwise difference per site
+  pair_dist <- dist.dna(as.DNAbin(char_mat), model = "raw") # Returns for every pair of sequences, the proportion of sites that differ
+  pi <- mean(as.vector(pair_dist)) # Mean of those values
+
+  # Segregating sites (S): columns containing more than one distinct base
+  S <- sum(apply(char_mat, 2, function(col) length(unique(col)) > 1)) # Scans through matrix col by col for each col counts how many UNIQUE dna bases exist
+  # If more than one distinct letter = segregating site
+
+  # Haplotypes: sequences that are identical across every kept site are the SAME HAPLOTYPE.
+  hap_ids <- apply(char_mat, 1, paste, collapse = "")
+  # Glues all letters in each individual sample's row together to form a single long DNA string for each sample
+  hap_counts <- table(hap_ids)
+  # Counts how many times each unique seq string appears in sample group
+  n_hap <- length(hap_counts) # Total number of distinct unique seq variations (haplotypes) present in the group
+
+  # Haplotype diversity (Nei & Tajima): 1 minus the sum of squared haplotype frequencies,
+  # with an n/(n-1) small-sample correction
+  p <- as.numeric(hap_counts) / n # Calculates the proportion of each haplotype in the group by dividing its count by total number of sequences
+  Hd <- (n / (n - 1)) * (1 - sum(p^2)) # Nei and Tajima formula to calculate Haplotype diversity
+
+  # Packages all calculated statistics into single dataframe which finishes the function
+  data.frame(n_seqs = n,
+             sites_used = ncol(char_mat),
+             pi = pi,
+             segregating_sites = S,
+             n_haplotypes = n_hap,
+             hap_diversity = Hd)
+}
+
+# Results (per group)
+results <- rbind(Post = diversity_stats(post_sites),
+                 Pre = diversity_stats(pre_sites))
+print(results)
+
+write.csv(results, out_csv)
+
+# Pairwise deletion sensitivity check
+# Instead of above approach which threw away the COLUMN in seq alignment if even one sample is missing a base (risk of discarding good data)
+# pairwise deletion only ignores missing bases on a pair by pair basis (different pairs of samples are compared across slightly different lengths/regions of genome but use more data)
+pi_post_pairwise <- mean(as.vector(dist.dna(post, model = "raw", pairwise.deletion = TRUE))) # Nucleotide distances for pre and post and averages for pi.
+pi_pre_pairwise <- mean(as.vector(dist.dna(pre, model = "raw", pairwise.deletion = TRUE)))
+pairwise <- data.frame(group = c("Post", "Pre"), pi_pairwise_deletion = c(pi_post_pairwise, pi_pre_pairwise))
+print(pairwise)
+write.csv(pairwise, out_pairwise, row.names = FALSE)
+```
+
+### Step 17: Run it and compare to your original
+```bash
+Rscript --no-init-file diversity_stats/diversity_statistics.R \
+  diversity_stats/time_binned_alignments.rds \
+  diversity_stats/diversity_stats_by_group.csv \
+  diversity_stats/diversity_pairwise_deletion.csv
+git diff --ignore-cr-at-eol -- diversity_stats/diversity_stats_by_group.csv
+```
+
+Expected:
+- **Callable sites:** `11153 of 16905` and `0.6597456`.
+- **Results table:** Post π = 0.0001034561, S = 6, 7 haplotypes, Hd = 0.8242; Pre π = 0.0049454034, S = 300, 27 haplotypes, Hd = 0.9974.
+- **Pairwise deletion:** Post 0.0004051837, Pre 0.0045286179.
+- **The `git diff` on the CSV prints nothing,** meaning it matches your committed original exactly. Press `q` if the pager appears.
+
+Then commit:
+```bash
+git add diversity_stats/diversity_statistics.R diversity_stats/diversity_pairwise_deletion.csv
+git commit -m "Refactor diversity statistics script; save pairwise-deletion check to CSV"
+```
+
+If your numbers match the ones above, send me the output and we'll do the last script, `hypothesis_test.R`. It's the longest one, with the three `set.seed(2026)` calls, so we'll go carefully to be sure the permutation results come out identical.
 - **Verification:**
