@@ -1074,4 +1074,194 @@ This is the most interesting one, for three reasons:
 3. It contains the **`optINv` typo**. R is case-sensitive, so R probably ignored that option. Fixing it may change the tree and the log-likelihood.
 
 I'll send the refactored version once you've confirmed the commits went through. Before running it, please paste what the original tree run printed for `fit_ml`, if you still have it. It lists logLik, the gamma shape, the proportion of invariant sites and kappa. If you don't have it, don't worry: the new run will produce it, and we'll compare it with the committed tree.
+-**What I asked next:** (pasted the output of `fit_ml` results with and without the typo)
+- **Exact output (verbatim):**
+The typo had almost no effect, and your two paste-ins show why.
+
+### What the typo did
+| | Before (`optINv`, ignored) | After (`optInv`, working) |
+|---|---|---|
+| Log-likelihood | −26516.92 | **−26516.91** |
+| NNI topology moves | 6, then 0 | 6, then 0 |
+| "optimize invariant sites" step | missing | present |
+
+- **The only difference is 0.01 log-likelihood units.** The invariant-sites proportion was already optimized inside `modelTest`, so the starting model was nearly final.
+- **The topology search made the same 6 moves.** The tree is very likely the same, but we'll confirm that by comparing it directly after the run, not assume it.
+- **Use the corrected value in the paper.** Report log-likelihood −26516.91 (HKY+G(4)+I, optimized topology). In the Methods, say that all parameters were optimized together.
+- **Your pasted output shows only the optimization trace.** I still need the fitted values (kappa, gamma shape, invariant-site proportion). The new script will print them.
+- **I looked at what you pushed** (commit `2782ff8`, "beginning to implement snakemake"). It contains your `AI_USAGE.md` and `notes.md` updates, but no script or Snakefile changes yet. The `optINv` typo is still in the pushed `mammoth_tree.R`, which fits what you said about fixing it only in the console.
+
+### Step 9: Refactor `mammoth_tree.R`
+Changes from the original script:
+- **`setwd` is gone** (this script had one).
+- **Four arguments** now: the model-selection `.rds`, the metadata CSV, the output `.nwk` and the output `.pdf`.
+- **`optInv` is fixed.**
+- **The plot goes straight to a PDF.** You saved your PDFs by hand because PNG export was unreliable, and a script can't do that by hand.
+- **The on-screen `plot()` is removed.** Under `Rscript` it would create a stray `Rplots.pdf` file.
+- **The fitted parameters are printed** to the log.
+
+Replace the whole file with this:
+
+```r
+# Phylogenetic Tree - (HKY+G(4)+I) used to estimate maximum-likelihood tree
+# Usage: Rscript --no-init-file mammoth_tree.R <model_rds> <metadata_csv> <out_nwk> <out_pdf>
+library(phangorn)
+
+args <- commandArgs(trailingOnly = TRUE)
+rds_file <- if (length(args) >= 1) args[1] else "model_and_tree/mammoth_model_select_results.rds"
+meta_csv <- if (length(args) >= 2) args[2] else "data_aquisition/mammoth_mitogenome_accessions.csv"
+out_nwk  <- if (length(args) >= 3) args[3] else "model_and_tree/mammoth_tree.nwk"
+out_pdf  <- if (length(args) >= 4) args[4] else "model_and_tree/mammoth_tree_plot.pdf"
+
+# Load .rds from "mammoth_sub_model_select.R"
+mt <- readRDS(rds_file)
+
+# Retrieve already-fitted HKY+G(4)+I model because modelTest() already fit every candidate model under max likelihood in order to score it
+# phangorn stores those fitted objects internally so we can reuse the desired model instead of rebuilding from scratch
+env <- attr(mt, "env")
+fit_init <- eval(get("HKY+G(4)+I", env), env)
+
+# Full ML tree search - searches for the best tree topology (via nearest neighbor interchange rearrangements) and
+# optimizes branch lengths and the model's own parameters (gamma shape, prop of invariant sites) together.
+fit_ml <- optim.pml(fit_init, model = "HKY", optNni = TRUE, optGamma = TRUE, optInv = TRUE)
+# optNni searches topology tree
+# optGamma optimizes rate-variation param
+# optInv optimizes proportion of invariant sites (note capital I, lowercase nv)
+
+# Report the fitted model for the Methods/Results sections
+cat("\n==== Final fitted model ====\n")
+print(fit_ml)
+cat("logLik:", fit_ml$logLik, "\n")
+cat("Gamma shape:", fit_ml$shape, "\n")
+cat("Proportion invariant sites:", fit_ml$inv, "\n")
+
+# Extract tree and save in Newick format
+mammoth_tree <- fit_ml$tree
+write.tree(mammoth_tree, out_nwk)
+
+# Visualize colored by pre-/post-bottleneck groups
+# Bring in metadata so the tips can be labeled by group
+metadata <- read.csv(meta_csv)
+# Tip labels look like "MGXXXXXX.X" (accession + version) - strip the ".version" suffix so they match
+# the Accession_No column.
+tip_accessions <- sub("\\..*$", "", mammoth_tree$tip.label)
+tip_groups <- metadata$Group[match(tip_accessions, metadata$Accession_No)]
+
+# Swap the long FASTA header labels for short Lab IDs
+tree_for_plot <- mammoth_tree
+tree_for_plot$tip.label <- metadata$Lab_ID[match(tip_accessions, metadata$Accession_No)]
+
+# Reserve blank whitespace below lowest tip so scalebar has place to sit without overlapping
+n_tips <- length(tree_for_plot$tip.label)
+
+# Color: Post-bottleneck = maroon, Pre-bottleneck = dark blue
+tip_colors <- ifelse(grepl("^Post", tip_groups), "maroon", "darkblue")
+
+# Save the plot as a PDF (vector graphics, no manual export needed)
+pdf(out_pdf, width = 11, height = 8)
+plot(tree_for_plot, tip.color = tip_colors, cex = 0.8, no.margin = FALSE, y.lim = c(-3, n_tips + 1))
+add.scale.bar(x = 0, y = -2)
+legend("topleft", legend = c("Post-bottleneck (Wrangel Island)", "Pre-bottleneck (Siberia)"),
+       text.col = c("maroon", "darkblue"),
+       bty = "n")
+dev.off()
+
+# Which samples drive any squashed branches
+# node.depth.edgelength() gives the cumulative distance from the root to every node
+root_to_tip <- node.depth.edgelength(tree_for_plot)[1:n_tips]
+
+divergence <- data.frame(
+  Lab_ID = tree_for_plot$tip.label,
+  root_to_tip_distance = root_to_tip
+)
+divergence <- merge(divergence, metadata[, c("Lab_ID", "Median_CalBP", "Group")], by = "Lab_ID")
+
+# Sorted descending - most divergent at top
+cat("\n==== Root-to-tip distances (largest first) ====\n")
+print(head(divergence[order(-divergence$root_to_tip_distance), ], 8))
+# Expect the outlier group (GilbertM20, GilbertM21, GilbertM25, Oimyakon) at the top
+```
+
+### Step 10: Run it
+This re-runs the tree search, which took a while before, so let it finish:
+
+```bash
+Rscript --no-init-file model_and_tree/mammoth_tree.R \
+  model_and_tree/mammoth_model_select_results.rds \
+  data_aquisition/mammoth_mitogenome_accessions.csv \
+  model_and_tree/mammoth_tree.nwk \
+  model_and_tree/mammoth_tree_plot.pdf 2>&1 | tail -40
+```
+
+The `2>&1 | tail -40` shows only the last 40 lines, which include the fitted model and the divergence table. I expect the top four tips to be GilbertM20, GilbertM21, GilbertM25 and Oimyakon.
+
+### Step 11: Is it the same tree as before?
+```bash
+git show HEAD:model_and_tree/mammoth_tree.nwk > /tmp/old_tree.nwk
+Rscript --no-init-file -e 'library(phangorn); o <- read.tree("/tmp/old_tree.nwk"); n <- read.tree("model_and_tree/mammoth_tree.nwk"); cat("Robinson-Foulds distance:", RF.dist(o, n), "\n")'
+```
+
+The **Robinson-Foulds distance** counts how many splits in the tree differ between two trees.
+- **`0`** means the same topology: the typo fix didn't change the tree's shape.
+- **A positive number** means some branches rearranged. Send me the value and we'll look at which ones.
+
+Then commit:
+```bash
+git add model_and_tree/mammoth_tree.R model_and_tree/mammoth_tree.nwk model_and_tree/mammoth_tree_plot.pdf
+git commit -m "Refactor tree script; fix optInv typo; write plot to PDF"
+```
+
+Please paste the last 40 lines from Step 10 and the Step 11 result. Next, `time_binning.R`, then the statistics and test scripts, and then we wire it all into the Snakefile.
+- **What I asked next:** (pasted the output of terminal)
+- **Exact output (verbatim):**
+The tree script works, and the results look biologically sensible. One result needs a closer look before we commit the new tree: **the topology isn't identical to your original.**
+
+### What worked
+- **The outlier group is correct.** The top four root-to-tip distances are Oimyakon, GilbertM21, GilbertM25 and GilbertM20, matching your original analysis. Rogaev and P011 come next, at about 0.003 and 0.002, far below those four.
+- **Fitted parameters** for the Methods (HKY+G(4)+I, topology and parameters optimized together):
+  - log-likelihood −26516.91
+  - gamma shape α = 0.99
+  - proportion of invariant sites = 0.852
+  - phangorn's rate matrix gives transitions about 52× the rate of each transversion type (κ ≈ 51.9)
+  - base frequencies: A 0.330, C 0.252, G 0.131, T 0.287
+- **Report α and the invariant proportion together, and don't interpret them separately.** The two are statistically correlated in models with both terms: a high invariant fraction can trade off against the gamma shape. For your question, the point is that the tree model accounts for rate variation, so I'd say that and nothing more.
+
+### What needs a look
+The Robinson-Foulds distance is **6**. The maximum possible for 42 taxa is 78, so it's about 8%, which is small. It means 3 splits in each tree differ, probably a few small local rearrangements. We don't know why yet. There are two likely causes:
+1. **The `optInv` fix.** Log-likelihood moved by only 0.01, but a tiny change can flip a near-tied rearrangement.
+2. **A different R or package version.** Conda gave you R 4.5.3 and Linux builds, while the original ran on Windows R 4.6.1.
+
+The most likely explanation is that these are **unresolved relationships**. Many Wrangel mammoths share identical mitochondrial haplotypes (W1 appears in four samples, for instance). When sequences are identical, the tree has no data to decide their order, so different software runs can resolve them differently. That would not be a scientific problem. But we should test it, not assume it.
+
+### Step 12: Which tips moved, and do the trees fit equally well?
+This code does two things. It prints the differing splits, then re-fits your old topology under the same model and compares log-likelihoods. If the old tree scores within about 1–2 log-likelihood units of the new tree, the data cannot distinguish them. This takes a few minutes.
+
+```bash
+Rscript --no-init-file -e '
+suppressMessages(library(phangorn))
+o <- read.tree("/tmp/old_tree.nwk"); n <- read.tree("model_and_tree/mammoth_tree.nwk")
+cat("\n--- Splits that differ between old and new tree ---\n")
+comparePhylo(o, n, plot = FALSE, force.rooted = FALSE)
+aln <- read.phyDat("alignment/mammoth_aligned.fasta", format = "fasta", type = "DNA")
+fit_o <- pml(o, aln, model = "HKY", k = 4, shape = 0.99, inv = 0.85)
+fit_o <- optim.pml(fit_o, model = "HKY", optGamma = TRUE, optInv = TRUE, optEdge = TRUE)
+cat("\nOld topology logLik:", fit_o$logLik, "\nNew topology logLik: -26516.91\n")
+' 2>&1 | tail -40
+```
+
+How to read it:
+- **Old topology logLik close to −26516.91** (within about 1–2): the trees are equally supported by the data, so the difference doesn't matter. We keep the new tree and note this in the Methods.
+- **Old topology clearly better, by more than 3 or so:** the new search is stuck in a worse spot, and we'd investigate.
+- **The tip list from `comparePhylo`:** if the moving tips are the identical Wrangel haplotypes (W1, W4 and so on), that confirms they're unresolved. If a pre-bottleneck sample like P011 moves in or out of the Wrangel group, tell me, because that would matter for your story.
+
+### Housekeeping
+- **Don't add `mammoth_tree_plot.png`** (it shows as untracked). It's an old leftover, and the script now writes a PDF. You can delete it, or leave it untracked.
+- **Commit only the script for now:**
+  ```bash
+  git add model_and_tree/mammoth_tree.R
+  git commit -m "Refactor tree script: path-independent, optInv fixed, PDF output"
+  ```
+- **Hold the new `.nwk` and `.pdf`** until the Step 12 result is in. Then we commit them together with a note explaining the difference.
+
+Paste the Step 12 output and we'll decide about the tree. After that we refactor `time_binning.R`, which should be quick.
 - **Verification:**
