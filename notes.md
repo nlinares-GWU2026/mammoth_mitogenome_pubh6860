@@ -24,7 +24,6 @@ The plot has 4-5 separate humps, not one bell curve. The humps come from the 4 a
 **Limits:** Permutation test assumes samples are interchangeable under the null. They aren't entirely because the PRe samples come from different regions and time periods. The test shows that the two groups differ more than random labeling would produce, and it can't prove the founder effect is the cause. The paper's own findings, the Wrangel isolation date and the haplotype labels, are what connect the result to a founder effect. 
 These results come from mitochondrial genome only, which is a single non-recombining locus.
 Result supports "Diversity collapsed after isolation." Not "Low diversity caused extinction." 
-## Current: 
 12. Implementing Snakemake for reproducibility. So far, the only issue run into was that conda gave me R version 4.5.3 while my analysis was run on R version (Windows) 4.6.1. The Snakemake run will use 4.5.3 so it may differ in a decimal place from original results. Methods will say which R version produced the final numbers. Tree rerun under conda R 4.5.3: RF distance 6 vs original, logLik −26516.91 vs old topology −26516.90, a rearrangement among near-identical Wrangel haplotypes. Refactoring of all scripts into format to build Snakemake flow. 
 Snakefile:
 - One rule per step. Each rule has inputs, outputs, and the command to run. For example, `align` turns the download FASTA into the aligned FASTA. 
@@ -59,3 +58,4 @@ cmp <- function(x, y) { o <- read.csv(sprintf("/tmp/repro/%s.csv", x)); n <- rea
 cmp("a", "b"); cmp("c", "d"); cmp("a", "head")'
 ```
 After pasting the outputs, the idea that it was a threading issue is wrong. The single-thread runs (c and d) vary by 0.376 AIC, as much as the default runs (a and b) at 0.380. So the variation isn't caused by multithreading. Is it a problem? Probably not for your conclusions, for two reasons 1) Same ranking: FALSE is expected with this much wobble. Many models sit within a few hundredths of an AIC unit of each other, so a 0.4 wobble reshuffles near-ties. 2) The top models are all within a small AIC range. The top 5 were within about 1.2 units of each other. Common rule is that models within 2 AIC units are about equally supported, and HKY+G(4)+I is the simplest of that group, with the fewest parameters. That is a stronger justification than it was just the winner. Additionally, the final tree fit doesn't care. The fit afterward lands on the same log-likelihood, gamma shape, and invariant proportion. 
+

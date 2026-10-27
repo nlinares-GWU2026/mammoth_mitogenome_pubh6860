@@ -2123,3 +2123,116 @@ The top of the table is stable across all five runs: HKY+G(4)+I, TPM2u+G(4)+I, T
 
 Software versions for your Methods: R 4.5.3, ape 5.8.1, phangorn 2.12.1, seqinr 4.2.44, MAFFT 7.525, Snakemake 9.27.1.
 - **Verification:** I ran all the commands, understood and noted the errors, and thought through the solutions Claude gave me. It seemed plausible and justified for my report.  
+
+## Entry 11:
+- **Tool:** Claude (Sonnet 5.5)
+- **What I was doing:** A final reproducability test.
+- **What I asked (verbatim):** (pasted versions of dependencies to Claude) + "Can you help me run one final from scratch reproducibility test?" 
+- **Exact output (verbatim):** 
+
+### Step 27: Pin the versions
+Replace `environment.yml` with:
+
+```yaml
+name: mammoth-project
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - mafft=7.525
+  - r-base=4.5.3
+  - r-ape=5.8_1
+  - r-phangorn=2.12.1
+  - r-seqinr=4.2_44
+  - snakemake=9.27.1
+```
+
+Each line now says exactly which version to install. I left out the build strings (the `h56fdecd_0` parts). They are tied to your operating system, so including them would break the file on a Mac.
+
+### Step 27b: Prove the file builds a working environment from scratch
+This is the real reproducibility test, the same delete-and-recreate check you did in your Applied Computing lab. We build a **second, separate** environment from the file and run the whole pipeline in it. Your working environment stays untouched.
+
+```bash
+mamba env create -n mammoth-test -f environment.yml
+conda activate mammoth-test
+Rscript --no-init-file -e 'cat(R.version.string, "\n"); for (p in c("ape","phangorn","seqinr")) cat(p, as.character(packageVersion(p)), "\n")'
+snakemake --cores 4 --forceall 2>&1 | tail -4
+git --no-pager diff --ignore-cr-at-eol --stat; echo "--- end of diff ---"
+```
+
+**What to expect:**
+- The environment build takes a few minutes and ends with a "To activate this environment" message.
+- The versions print as R 4.5.3, ape 5.8.1, phangorn 2.12.1 and seqinr 4.2.44.
+- The pipeline ends with `9 of 9 steps (100%) done`.
+- The diff will list only the model and tree files and the logs, as before. If the diversity, permutation or subsample CSVs show up, tell me.
+
+Then return to your regular environment and remove the test one:
+
+```bash
+conda activate mammoth-project
+mamba env remove -n mammoth-test
+```
+
+### Commit
+Before committing the pins, the rebuild may have touched the model and tree files again. Those small changes are the known wobble, so don't commit them with the pin change. Commit only the environment file:
+
+```bash
+git add environment.yml
+git commit -m "Pin R, R package, MAFFT and Snakemake versions"
+git restore model_and_tree/ logs/ diversity_stats/
+git status
+```
+
+`git restore` throws away the re-run's changes and returns those files to their committed state. It only affects those folders. `git status` should say the working tree is clean.
+
+### What comes next
+When the test environment passes, you're ready to merge into `main`.
+- **What I asked next:** (pasted the output of the run - success!)
+- **Exact output (verbatim):** 
+The test passed:
+
+- **The environment built from the file.** It gave R 4.5.3, ape 5.8.1, phangorn 2.12.1 and seqinr 4.2.44, matching what we pinned.
+- **The pipeline completed in a fresh environment.** `9 of 9 steps (100%) done` in about 36 seconds.
+- **Your main results didn't move.** The diversity, pairwise, permutation and subsample CSVs are not in the diff, so a clean environment built from `environment.yml` reproduces them exactly. The files that changed are the known fitting-step wobble (model table, tree, logs), plus `environment.yml`, which is your pin edit.
+
+### Finish the cleanup
+`mamba env remove` will ask you to confirm. Type `y` and press Enter. Then:
+
+```bash
+git add environment.yml
+git commit -m "Pin R, R package, MAFFT and Snakemake versions"
+git restore model_and_tree/ logs/ diversity_stats/
+git status
+```
+
+`git restore` only discards the rebuild's wobble in those three folders. Your `AI_USAGE.md` edits aren't in those folders, so they stay. If `git status` lists `AI_USAGE.md` or `notes.md` as modified, commit them:
+
+```bash
+git add AI_USAGE.md notes.md
+git commit -m "Update AI usage log and notes"
+```
+
+`git status` should now say `nothing to commit, working tree clean`.
+
+### Merge into `main` and push
+Everything on `main` is your original analysis, and everything on `snakemake-workflow` is the same analysis wrapped in a verified pipeline. These commands make the branch version official:
+
+```bash
+git push -u origin snakemake-workflow
+git checkout main
+git merge snakemake-workflow
+```
+
+You expect to see **`Fast-forward`** and a list of changed files. That's the simple case: `main` hasn't moved since you branched, so Git just moves it forward. If you see anything else, such as a message about a merge commit, a conflict or an editor opening, stop and paste what it says before doing anything more.
+
+If it fast-forwarded, push it:
+
+```bash
+git push origin main
+git log --oneline -5
+```
+
+Then open your repo on GitHub and check that the `Snakefile`, the README and the pinned `environment.yml` are visible on `main`. The README renders automatically on the repo's front page, which is a good last check of the quick-start text.
+
+The first push (`push -u origin snakemake-workflow`) also gives you a backup of the branch on GitHub. You can delete the branch afterward (`git branch -d snakemake-workflow`), but there's no hurry.
