@@ -1993,5 +1993,133 @@ git add model_and_tree/ diversity_stats/ notes.md
 git commit -m "Regenerate all outputs via Snakemake (conda R 4.5.3); model table shifted by constant offset, conclusions unchanged"
 ```
 
-Then we finish with the duplicate-file cleanup, the README section, and the pipeline diagram.
 - **Verification:** I ran each and every code as directed, retyped every script or file sent, understood the changes and the process, and ensured the final output was correct and logical. Claude said identical; the main diff showed a constant AIC offset; conclusions unchanged.
+
+## Entry 10: 
+- **Tool:** Claude (Sonnet 5.5)
+- **What I was doing:** I was doing a final snakemake check and ran into an error about the diff in the AIC values which is bigger than the rounding values
+- **What I asked (verbatim):** 
+```bash
+08:20:30 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ git show HEAD:model_and_tree/mammoth_model_select_sorted_results.csv > /tmp/prev_model.csv
+-bash: /tmp/prev_model.csv: cannot overwrite existing file
+08:21:58 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ Rscript --no-init-file -e 'o <- read.csv("/tmp/prev_model.csv"); n <- read.csv("model_and_tree/mammoth_model_select_sorted_results.csv"); m <- merge(o, n, by = "Model"); cat("same ranking:", identical(o$Model, n$Model), "\nmax abs AIC diff:", max(abs(m$AIC.x - m$AIC.y)), "\nmax abs logLik diff:", max(abs(m$logLik.x - m$logLik.y)), "\n")'
+same ranking: FALSE
+max abs AIC diff: 0.3526956
+max abs logLik diff: 0.1763478
+08:22:12 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ git add model_and_tree/ diversity_stats/ logs/ notes.md AI_USAGE.md
+08:22:29 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ git commit -m "Regenerate outputs via Snakemake (conda R 4.5.3); remove duplicate input copies; model table offset by constant, conclusions unchanged"
+[snakemake-workflow 5ef542c] Regenerate outputs via Snakemake (conda R 4.5.3); remove duplicate input copies; model table offset by constant, conclusions unchanged
+ 14 files changed, 288 insertions(+), 34071 deletions(-)
+ delete mode 100644 alignment/mammoth_mitogenome_accessions.csv
+ delete mode 100644 alignment/mammoth_mitogenomes.fasta
+ delete mode 100644 diversity_stats/mammoth_aligned.fasta
+ delete mode 100644 diversity_stats/mammoth_mitogenome_accessions.csv
+ delete mode 100644 model_and_tree/mammoth_aligned.fasta
+ delete mode 100644 model_and_tree/mammoth_mitogenome_accessions.csv
+08:22:41 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ git status
+On branch snakemake-workflow
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        alignment/alignment_check.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+08:22:46 (mammoth-project) nelin
+```
+- **Exact output (verbatim):**
+Your commit went through (`5ef542c`), and the working tree is clean apart from one untracked file, so the cleanup is done. The comparison result needs more care, though, because I don't think it measured what we wanted.
+
+### What went wrong with the comparison
+The first line failed: `cannot overwrite existing file`. Your shell has a safety setting (`noclobber`) that refuses to overwrite a file with `>`. So `/tmp/prev_model.csv` was **an older file from some earlier step**, not the version you just committed. That's why the result doesn't tell us what we wanted. You can overwrite deliberately with `>|` instead of `>`.
+
+What the result does show:
+- **The ranking differs and the AIC values differ by up to 0.35**, between that stale file and the current one.
+- **That's bigger than the rounding noise I described** (about 1e-8), so my "just rounding" explanation was too confident. I don't yet know how much a model-selection re-run varies. The winner (HKY+G(4)+I) is far enough ahead that a 0.35 wobble can't change it, but near-tied models like TPM2u+G(4)+I and TPM3u+G(4)+I (about 0.06 AIC apart) could swap places.
+
+A likely suspect is that conda's R uses a multithreaded math library, and the order of floating-point additions can then change from run to run. That's a hypothesis, so let's test it. This runs the model-selection script four times into a scratch folder without touching your repo (about 2–3 minutes). Two runs use the default settings and two force a single thread:
+
+```bash
+mkdir -p /tmp/repro
+for tag in a b; do
+  Rscript --no-init-file model_and_tree/mammoth_sub_model_select.R alignment/mammoth_aligned.fasta /tmp/repro/$tag.rds /tmp/repro/$tag.csv > /dev/null 2>&1
+done
+for tag in c d; do
+  OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript --no-init-file model_and_tree/mammoth_sub_model_select.R alignment/mammoth_aligned.fasta /tmp/repro/$tag.rds /tmp/repro/$tag.csv > /dev/null 2>&1
+done
+git show HEAD:model_and_tree/mammoth_model_select_sorted_results.csv >| /tmp/repro/head.csv
+Rscript --no-init-file -e '
+cmp <- function(x, y) { o <- read.csv(sprintf("/tmp/repro/%s.csv", x)); n <- read.csv(sprintf("/tmp/repro/%s.csv", y)); m <- merge(o, n, by = "Model"); cat(x, "vs", y, "| same ranking:", identical(o$Model, n$Model), "| max AIC diff:", max(abs(m$AIC.x - m$AIC.y)), "\n") }
+cmp("a", "b"); cmp("c", "d"); cmp("a", "head")'
+```
+
+How to read the three lines:
+- **`c vs d` shows 0 and `a vs b` shows a difference:** threading is the cause, and pinning to one thread fixes it. I'll add that to the Snakefile so the pipeline is exactly reproducible.
+- **Both show differences:** the variation comes from somewhere else, and we'll document it as a known tolerance and move on.
+- **`a vs head`** shows how far the committed table is from a fresh run.
+
+### Housekeeping
+`alignment_check.txt` is the output of the new verify rule and is still untracked. Add it:
+
+```bash
+git add alignment/alignment_check.txt
+git commit -m "Add alignment check output"
+```
+
+Paste the three comparison lines and I'll adjust the Snakefile if needed.
+- **What I asked next:** (pasted the output of the command)
+- **Exact output (verbatim):**
+The threading idea is wrong. The single-thread runs (`c` and `d`) vary by 0.376 AIC, as much as the default runs (`a` and `b`) at 0.380. So the variation isn't caused by multithreading, and I won't add the thread setting to the Snakefile. I don't know the real cause yet. It's something in how phangorn's `modelTest` optimizes each model, not in your setup. The fits just don't converge to exactly the same point every time.
+
+### Is that a problem?
+Probably not for your conclusions, for two reasons.
+- **"Same ranking: FALSE" is expected with this much wobble.** Many models sit within a few hundredths of an AIC unit of each other, so a 0.4 wobble reshuffles near-ties. For example, among the gamma-only models, `HKY+G(4)`, `TPM3u+G(4)` and `TPM2u+G(4)` are about 0.06 apart. What matters is whether the *top* of the table is stable.
+- **Your top models are all within a small AIC range.** The top five were within about 1.2 units of each other (HKY+G(4)+I, TPM2u, TPM3u, TPM1u, TrN, all with gamma and invariant sites). A common rule of thumb is that models within about 2 AIC units are about equally supported, and HKY+G(4)+I is the **simplest** of that group, with the fewest parameters. That's a stronger justification than "it was the winner" and doesn't depend on tiny differences. The Methods can say exactly that.
+- **The final tree fit doesn't care.** The fit afterward lands on the same log-likelihood (−26516.91), gamma shape (0.9901) and invariant proportion (0.8517) on every run we've done, including the original Windows one.
+
+Let's confirm the top of the table is stable across your five files:
+
+```bash
+Rscript --no-init-file -e 'for (t in c("a","b","c","d","head")) { d <- read.csv(sprintf("/tmp/repro/%s.csv", t)); cat(t, ":", paste(head(d$Model, 5), collapse = " > "), "| best AIC:", round(min(d$AIC), 2), "\n") }'
+```
+
+I expect HKY+G(4)+I first in every row, with the next four models in slightly varying orders. If HKY+G(4)+I is *not* first in some run, that's fine, but tell me. The tree script picks HKY+G(4)+I by name, so the "simplest model within about 2 AIC units" logic is what we'd cite, not "it came first."
+
+### How to describe reproducibility in the paper
+- **Exactly reproducible:** everything derived from the alignment: the alignment itself (byte for byte), the group split, π, S, haplotype diversity, the permutation tests and the rarefaction (identical across forced rebuilds).
+- **Reproducible within a small tolerance:** the model-selection table (about 0.4 AIC between identical runs) and branch lengths (tiny differences). The topology and the fitted model parameters came out the same each time.
+
+I'd put that in the Methods and in your notes.
+
+### Next: record the software versions
+For the Methods, and so `environment.yml` gives the same environment to someone else, we need the exact versions:
+
+```bash
+Rscript --no-init-file -e 'for (p in c("ape","phangorn","seqinr")) cat(p, as.character(packageVersion(p)), "\n"); cat(R.version.string, "\n")'
+mafft --version
+snakemake --version
+```
+
+Paste the output. I'll tell you how to pin them in `environment.yml`.
+- **What I asked next:** (pasted my output of the above commands)
+```bash
+08:38:58 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow✔|→ Rscript --no-init-file -e 'for (t in c("a","b","c","d","head")) { d <- read.csv(sprintf("/tmp/repro/%s.csv", t)); cat(t, ":", paste(head(d$Model, 5), collapse = " > "), "| best AIC:", round(min(d$AIC), 2), "\n") }'
+a : HKY+G(4)+I > TPM2u+G(4)+I > TPM3u+G(4)+I > TPM1u+G(4)+I > TrN+G(4)+I | best AIC: 53208.09
+b : HKY+G(4)+I > TPM2u+G(4)+I > TPM3u+G(4)+I > TPM1u+G(4)+I > TrN+G(4)+I | best AIC: 53208.09
+c : HKY+G(4)+I > TPM2u+G(4)+I > TPM3u+G(4)+I > TPM1u+G(4)+I > TrN+G(4)+I | best AIC: 53208.09
+d : HKY+G(4)+I > TPM2u+G(4)+I > TPM3u+G(4)+I > TPM1u+G(4)+I > TrN+G(4)+I | best AIC: 53208.09
+head : HKY+G(4)+I > TPM2u+G(4)+I > TPM3u+G(4)+I > TPM1u+G(4)+I > TrN+G(4)+I | best AIC: 53208.09
+08:48:02 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ Rscript --no-init-file -e 'for (p in c("ape","phangorn","seqinr")) cat(p, as.character(packageVersion(p)), "\n"); cat(R.version.string, "\n")'
+ape 5.8.1
+phangorn 2.12.1
+seqinr 4.2.44
+R version 4.5.3 (2026-03-11)
+08:48:33 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ mafft --version
+v7.525 (2024/Mar/13)
+08:48:43 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ snakemake --version
+9.27.1
+08:48:49 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→
+```
+- **Exact output:** 
+The top of the table is stable across all five runs: HKY+G(4)+I, TPM2u+G(4)+I, TPM3u+G(4)+I, TPM1u+G(4)+I and TrN+G(4)+I, in that order, with a best AIC of 53208.09 every time. The reshuffling is only among near-tied models further down, so the model-selection step is reproducible where it matters.
+
+Software versions for your Methods: R 4.5.3, ape 5.8.1, phangorn 2.12.1, seqinr 4.2.44, MAFFT 7.525, Snakemake 9.27.1.
+- **Verification:** I ran all the commands, understood and noted the errors, and thought through the solutions Claude gave me. It seemed plausible and justified for my report.  

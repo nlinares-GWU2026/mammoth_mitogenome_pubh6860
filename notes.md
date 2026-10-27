@@ -35,3 +35,27 @@ Snakefile:
 - `rule all` lists final files, and asking for it builds everything.
 Issue: Claude was incorrect in saying that the first re-run of model selection matched my original table exactly. `git diff` hides files that have been staged and it is suspected why nothing printed. The true snakefile call showed different numbers although they are very similar. Conclusions: 1) the model table differs but the conclusions do not. Every model with both gamma and invariant sites shifted by the same amount (about 3.2 AIC units), so the ranking and the AIC weights are essentially unchanged. The cause is probably a small difference in how this R/phangorn version fits the starting model. 2) the final tree fits the same as my corrected earlier run. `tree.log` shows logLik -26516.91, gamma shape 0.9901088, invariant sites 0.8517005, and identical base frequencies. After optimizing, the model lands in the same place either way. 3) the pipeline vs my earlier manual run only differ in rounding noise. Like around the 9th decimal. This is why git shows 92 changed rows without any visible change. Repated runs are not bit-identical for these fitting steps, so for them we compare with a tolerance - not checksum. 4) The speed of my machine was real and fast. After doing checks, the topology was unchanged (RF distance 0 so the pipeline tree has the same shape as the one I committed, with only rounding-level differences in branch lengths), the results were complete and intact (compared with `main`, the diversity, permutation, and subsample CSVs are not in the diff at all so they match my original numbers. The only difference was model-selection.CSV which is a constant shift), and the HKY+I row for the paper result was: df 86, logLik −26521.33, AIC 53214.66, AICc 53215.55, BIC 53879.90.
   - Detail for paper: AIC prefers HKY+G(4)+I over HKY+I by about 6.6 units (53208.09 vs 53214.66). BIC prefers HKY+I by only about 1.2 (53879.90 vs 53881.07) which is a very small BIC margin next to the clear AIC preference which supports keeping gamma. 
+On the final from scratch snakemake file, I ran into an error to which claude responded: What went wrong with the comparison
+
+The first line failed: cannot overwrite existing file. Your shell has a safety setting (noclobber) that refuses to overwrite a file with >. So /tmp/prev_model.csv was an older file from some earlier step, not the version you just committed. That’s why the result doesn’t tell us what we wanted. You can overwrite deliberately with >| instead of >.
+
+What the result does show:
+
+The ranking differs and the AIC values differ by up to 0.35, between that stale file and the current one.
+That’s bigger than the rounding noise I described (about 1e-8), so my “just rounding” explanation was too confident. I don’t yet know how much a model-selection re-run varies. The winner (HKY+G(4)+I) is far enough ahead that a 0.35 wobble can’t change it, but near-tied models like TPM2u+G(4)+I and TPM3u+G(4)+I (about 0.06 AIC apart) could swap places.
+
+A likely suspect is that conda’s R uses a multithreaded math library, and the order of floating-point additions can then change from run to run. That’s a hypothesis, so let’s test it. This runs the model-selection script four times into a scratch folder without touching your repo (about 2–3 minutes). Two runs use the default settings and two force a single thread:
+```bash
+mkdir -p /tmp/repro
+for tag in a b; do
+  Rscript --no-init-file model_and_tree/mammoth_sub_model_select.R alignment/mammoth_aligned.fasta /tmp/repro/$tag.rds /tmp/repro/$tag.csv > /dev/null 2>&1
+done
+for tag in c d; do
+  OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 Rscript --no-init-file model_and_tree/mammoth_sub_model_select.R alignment/mammoth_aligned.fasta /tmp/repro/$tag.rds /tmp/repro/$tag.csv > /dev/null 2>&1
+done
+git show HEAD:model_and_tree/mammoth_model_select_sorted_results.csv >| /tmp/repro/head.csv
+Rscript --no-init-file -e '
+cmp <- function(x, y) { o <- read.csv(sprintf("/tmp/repro/%s.csv", x)); n <- read.csv(sprintf("/tmp/repro/%s.csv", y)); m <- merge(o, n, by = "Model"); cat(x, "vs", y, "| same ranking:", identical(o$Model, n$Model), "| max AIC diff:", max(abs(m$AIC.x - m$AIC.y)), "\n") }
+cmp("a", "b"); cmp("c", "d"); cmp("a", "head")'
+```
+After pasting the outputs, the idea that it was a threading issue is wrong. The single-thread runs (c and d) vary by 0.376 AIC, as much as the default runs (a and b) at 0.380. So the variation isn't caused by multithreading. Is it a problem? Probably not for your conclusions, for two reasons 1) Same ranking: FALSE is expected with this much wobble. Many models sit within a few hundredths of an AIC unit of each other, so a 0.4 wobble reshuffles near-ties. 2) The top models are all within a small AIC range. The top 5 were within about 1.2 units of each other. Common rule is that models within 2 AIC units are about equally supported, and HKY+G(4)+I is the simplest of that group, with the fewest parameters. That is a stronger justification than it was just the winner. Additionally, the final tree fit doesn't care. The fit afterward lands on the same log-likelihood, gamma shape, and invariant proportion. 
