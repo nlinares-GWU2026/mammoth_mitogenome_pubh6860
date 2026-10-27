@@ -1,0 +1,54 @@
+nthread = 0
+nthreadpair = 0
+nthreadtb = 0
+ppenalty_ex = 0
+stacksize: 8192 kb
+generating a scoring matrix for nucleotide (dist=200) ... done
+Gap Penalty = -1.53, +0.00, +0.00
+
+
+
+Making a distance matrix ..
+
+There are 28051 ambiguous characters.
+    1 / 42
+done.
+
+Constructing a UPGMA tree (efffree=0) ... 
+    0 / 42   10 / 42   20 / 42   30 / 42   40 / 42
+done.
+
+Progressive alignment 1/2... 
+STEP     1 / 41  fSTEP     2 / 41  fSTEP     3 / 41  fSTEP     4 / 41  fSTEP     5 / 41  fSTEP     6 / 41  fSTEP     7 / 41  fSTEP     8 / 41  fSTEP     9 / 41  fSTEP    10 / 41  fSTEP    11 / 41  fSTEP    12 / 41  fSTEP    13 / 41  fSTEP    14 / 41  fSTEP    15 / 41  fSTEP    16 / 41  fSTEP    17 / 41  fSTEP    18 / 41  fSTEP    19 / 41  fSTEP    20 / 41  fSTEP    21 / 41  fSTEP    22 / 41  fSTEP    23 / 41  fSTEP    24 / 41  fSTEP    25 / 41  fSTEP    26 / 41  f
+Reallocating..done. *alloclen = 34810
+STEP    27 / 41  fSTEP    28 / 41  fSTEP    29 / 41  fSTEP    30 / 41  fSTEP    31 / 41  fSTEP    32 / 41  fSTEP    33 / 41  fSTEP    34 / 41  fSTEP    35 / 41  fSTEP    36 / 41  fSTEP    37 / 41  fSTEP    38 / 41  fSTEP    39 / 41  fSTEP    40 / 41  fSTEP    41 / 41  f
+done.
+
+Making a distance matrix from msa.. 
+    0 / 42
+done.
+
+Constructing a UPGMA tree (efffree=1) ... 
+    0 / 42   10 / 42   20 / 42   30 / 42   40 / 42
+done.
+
+Progressive alignment 2/2... 
+STEP     1 / 41  fSTEP     2 / 41  fSTEP     3 / 41  fSTEP     4 / 41  fSTEP     5 / 41  fSTEP     6 / 41  fSTEP     7 / 41  fSTEP     8 / 41  fSTEP     9 / 41  fSTEP    10 / 41  fSTEP    11 / 41  fSTEP    12 / 41  fSTEP    13 / 41  fSTEP    14 / 41  fSTEP    15 / 41  fSTEP    16 / 41  fSTEP    17 / 41  fSTEP    18 / 41  fSTEP    19 / 41  fSTEP    20 / 41  fSTEP    21 / 41  fSTEP    22 / 41  fSTEP    23 / 41  fSTEP    24 / 41  fSTEP    25 / 41  fSTEP    26 / 41  fSTEP    27 / 41  fSTEP    28 / 41  fSTEP    29 / 41  fSTEP    30 / 41  fSTEP    31 / 41  fSTEP    32 / 41  fSTEP    33 / 41  fSTEP    34 / 41  fSTEP    35 / 41  fSTEP    36 / 41  fSTEP    37 / 41  fSTEP    38 / 41  fSTEP    39 / 41  fSTEP    40 / 41  fSTEP    41 / 41  f
+done.
+
+disttbfast (nuc) Version 7.525
+alg=A, model=DNA200 (2), 1.53 (4.59), -0.00 (-0.00), noshift, amax=0.0
+0 thread(s)
+
+
+Strategy:
+ FFT-NS-2 (Fast but rough)
+ Progressive method (guide trees were built 2 times.)
+
+If unsure which option to use, try 'mafft --auto input > output'.
+For more information, see 'mafft --help', 'mafft --man' and the mafft page.
+
+The default gap scoring scheme has been changed in version 7.110 (2013 Oct).
+It tends to insert more gaps into gap-rich regions than previous versions.
+To disable this change, add the --leavegappyregion option.
+

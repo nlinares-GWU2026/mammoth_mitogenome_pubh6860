@@ -1,0 +1,11 @@
+Callable sites: 11153 of 16905 (expect 11153)
+Proportion callable: 0.6597456 (expect 0.6597456)
+     n_seqs sites_used           pi segregating_sites n_haplotypes
+Post     14      11153 0.0001034561                 6            7
+Pre      28      11153 0.0049454034               300           27
+     hap_diversity
+Post     0.8241758
+Pre      0.9973545
+  group pi_pairwise_deletion
+1  Post         0.0004051837
+2   Pre         0.0045286179

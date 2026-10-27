@@ -1,0 +1,26 @@
+Sites used: 11153 (expect 11153)
+Post pi: 0.0001034561 (expect 0.0001034561)
+Pre pi: 0.004945403 (expect 0.0049454034)
+
+Analysis 1 (all 42) observed Pre - Post pi: 0.004841947 (expect 0.004841947)
+Analysis 1 p-value: 9.999e-05 (expect 9.999e-05)
+null device 
+          1 
+
+Samples kept after removing ancient clade: 38 (expect 38 = 14 + 24)
+Pre pi without ancient clade: 0.001623986 (expect 0.001623986)
+Analysis 2 observed difference: 0.00152053 (expect 0.00152053)
+Analysis 2 p-value: 9.999e-05 (expect 9.999e-05)
+
+Variable sites within Pre: 300 
+     statistic post_observed pre14_median pre14_lower95 pre14_upper95
+1           pi  0.0001034561  5.06935e-03   0.001630641  7.436032e-03
+2            S  6.0000000000  2.38000e+02  87.000000000  2.590000e+02
+3 n_haplotypes  7.0000000000  1.40000e+01  13.000000000  1.400000e+01
+  prop_pre14_le_post
+1                  0
+2                  0
+3                  0
+                        analysis observed_diff_pi p_value_one_sided
+1                 All 42 samples      0.004841947         9.999e-05
+2 Without ancient clade (n = 38)      0.001520530         9.999e-05

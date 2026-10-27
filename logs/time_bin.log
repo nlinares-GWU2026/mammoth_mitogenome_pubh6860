@@ -1,0 +1,8 @@
+Alignment dimensions (sequences x bp): 42 16905 (expect 42 x 16905)
+seq_groups
+         Post-bottleneck           Pre-bottleneck Pre-bottleneck (undated) 
+                      14                       22                        6 
+seq_groups_clean
+Post-bottleneck  Pre-bottleneck 
+             14              28 
+Post: 14 sequences (expect 14); Pre: 28 sequences (expect 28)
