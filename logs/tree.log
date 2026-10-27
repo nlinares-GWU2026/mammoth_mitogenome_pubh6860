@@ -6,7 +6,7 @@ optimize rate matrix:  -26517.06 --> -26517.06
 optimize invariant sites:  -26517.06 --> -26517.06 
 optimize shape parameter:  -26517.06 --> -26517.06 
 optimize edge weights:  -26517.06 --> -26517.06 
-optimize topology:  -26517.06 --> -26516.92  NNI moves:  7 
+optimize topology:  -26517.06 --> -26516.92  NNI moves:  8 
 optimize rate matrix:  -26516.92 --> -26516.92 
 optimize invariant sites:  -26516.92 --> -26516.91 
 optimize shape parameter:  -26516.91 --> -26516.91 
@@ -21,40 +21,40 @@ optimize edge weights:  -26516.91 --> -26516.91
 model: HKY+G(4)+I 
 loglikelihood: -26516.91 
 unconstrained loglikelihood: -63000.55 
-Proportion of invariant sites: 0.8517005 
+Proportion of invariant sites: 0.8517006 
 Model of rate heterogeneity: Discrete gamma model
 Number of rate categories: 4 
-Shape parameter: 0.9901088 
+Shape parameter: 0.9901091 
         Rate Proportion
-1  0.0000000 0.85170052
-2  0.9101584 0.03707487
-3  3.1946064 0.03707487
-4  6.7319287 0.03707487
-5 16.1357539 0.03707487
+1  0.0000000 0.85170057
+2  0.9101592 0.03707486
+3  3.1946082 0.03707486
+4  6.7319314 0.03707486
+5 16.1357583 0.03707486
 
 Rate matrix:
          a        c        g        t
-a  0.00000  1.00000 51.92908  1.00000
-c  1.00000  0.00000  1.00000 51.92908
-g 51.92908  1.00000  0.00000  1.00000
-t  1.00000 51.92908  1.00000  0.00000
+a  0.00000  1.00000 51.92909  1.00000
+c  1.00000  0.00000  1.00000 51.92909
+g 51.92909  1.00000  0.00000  1.00000
+t  1.00000 51.92909  1.00000  0.00000
 
 Base frequencies:  
         a         c         g         t 
 0.3297731 0.2519268 0.1311054 0.2871946 
 logLik: -26516.91 
-Gamma shape: 0.9901088 
-Proportion invariant sites: 0.8517005 
+Gamma shape: 0.9901091 
+Proportion invariant sites: 0.8517006 
 null device 
           1 
 
 ==== Root-to-tip distances (largest first) ====
        Lab_ID root_to_tip_distance Median_CalBP                    Group
-37   Oimyakon          0.014933050        44828           Pre-bottleneck
-18 GilbertM21          0.014640047         n.a. Pre-bottleneck (undated)
-20 GilbertM25          0.014276451        60495           Pre-bottleneck
-17 GilbertM20          0.012993592         n.a. Pre-bottleneck (undated)
-42     Rogaev          0.003051367         n.a. Pre-bottleneck (undated)
-40       P011          0.002033285        11972           Pre-bottleneck
-21 GilbertM26          0.001789838        28769           Pre-bottleneck
-2       Ber28          0.001723102        14011           Pre-bottleneck
+37   Oimyakon          0.015776694        44828           Pre-bottleneck
+18 GilbertM21          0.015483690         n.a. Pre-bottleneck (undated)
+20 GilbertM25          0.015120094        60495           Pre-bottleneck
+17 GilbertM20          0.013837234         n.a. Pre-bottleneck (undated)
+42     Rogaev          0.003895002         n.a. Pre-bottleneck (undated)
+21 GilbertM26          0.002633473        28769           Pre-bottleneck
+2       Ber28          0.002566736        14011           Pre-bottleneck
+30       L410          0.002501417        14408           Pre-bottleneck

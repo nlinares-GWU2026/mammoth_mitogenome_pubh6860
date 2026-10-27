@@ -1813,7 +1813,7 @@ snakemake -n -p --forceall
 
 You should see 9 jobs: fetch_sequences, align, verify_alignment, model_select, tree, time_bin, diversity_stats, hypothesis_test and all. Check that no red errors appear. If it complains about a missing file, paste the message.
 
-## Step 24: The real test, rebuilding from scratch
+### Step 24: The real test, rebuilding from scratch
 This is the test your project needs. It re-downloads the sequences from NCBI, re-aligns them and re-runs every analysis, so it proves the pipeline works from raw data. It takes a while, mostly the model-selection and tree steps. Start it and leave it running.
 
 First, make sure everything is committed (`git status` should be clean apart from the `Snakefile`), so you can compare afterward:
@@ -1839,4 +1839,159 @@ sha256sum -c docs/results_checksums_before_snakemake.txt
 - **The downloaded FASTA** (`mammoth_mitogenomes.fasta`) should be unchanged. If NCBI has updated any of the 42 records since you downloaded them, it would differ, so a difference there would be worth knowing about.
 
 Paste the `tail -40` output and the three results.
-- **Verification:** I ran each and every code as directed, retyped every script or file sent, understood the changes and the process, and ensured the final output was correct and logical.
+- **What I asked next:** (pasted the results of the directed commands)
+- **Exact output (verbatim):**
+The pipeline ran start to finish (`9 of 9 steps (100%) done`), and the alignment checksum came back `OK`, so MAFFT rebuilt your alignment byte for byte from a fresh NCBI download. Two things in your output need explaining before we call this a match.
+
+### 1. The FAILED checksums are mostly my fault
+The "before" checksums were taken from files written by **Windows** R, which uses Windows line endings. The pipeline now writes the same CSVs with Linux line endings. Same numbers, different bytes, so `sha256sum` says FAILED. The list also includes the tree, which we expected to change.
+
+A fair comparison ignores line endings and goes against your untouched `main` branch:
+
+```bash
+git diff --ignore-cr-at-eol --stat main -- diversity_stats/*.csv model_and_tree/*.csv
+```
+
+If `main` gives an error, try `master`, or run `git branch` to see your branch names. The diversity, permutation and subsample CSVs should not appear in that list. If they don't, they match your originals.
+
+### 2. Two things I want to check in your results
+**The model-selection CSV shows 184 changed lines** (92 rows removed, 92 added). If that was a plain `git diff --stat`, it may only be line endings again. If it was the `--ignore-cr-at-eol` version, the numbers really changed, and I want to know how. Your manual re-run of this step matched your original exactly.
+
+**The whole pipeline took 39 seconds, and the tree step finished in 2 seconds.** Your manual tree run took noticeably longer. This may simply be a fast machine, but I won't assume it. The logs will show what happened.
+
+Run these and paste the output:
+
+```bash
+git diff --ignore-cr-at-eol -- model_and_tree/mammoth_model_select_sorted_results.csv | head -8
+tail -15 logs/model_select.log
+tail -30 logs/tree.log
+```
+
+What each one tells us:
+- **The first** shows the first old and new rows. We'll see whether the numbers differ at the 10th decimal place or are truly different.
+- **`model_select.log`** should end with `Best model by AIC: HKY+G(4)+I` and `Best model by BIC: HKY+I`.
+- **`tree.log`** should show `logLik: -26516.91`, a gamma shape near 0.99 and an invariant proportion near 0.852. If it shows those, the tree step really ran.
+
+One more thing I noticed: `mammoth_tree.nwk` is also different from the version you committed in Step 13. The log values and a Robinson-Foulds comparison against that file will tell us whether it's a real topology change or only branch-length digits.
+- **What I asked next (verbatim):**
+```bash
+git diff --ignore-cr-at-eol --stat main -- diversity_stats/*.csv model_and_tree/*.csv
+Result: 
+git diff --ignore-cr-at-eol --stat main -- diversity_stats/*.csv model_and_tree/*.csv
+
+git diff --ignore-cr-at-eol -- model_and_tree/mammoth_model_select_sorted_results.csv | head -8
+Result: 
+pubh6860 ±|snakemake-workflow ✗|→ git diff --ignore-cr-at-eol -- model_and_tree/mammoth_model_select_sorted_results.csv | head -8
+diff --git a/model_and_tree/mammoth_model_select_sorted_results.csv b/model_and_tree/mammoth_model_select_sorted_results.csv
+index 26cec02..29425a9 100644
+--- a/model_and_tree/mammoth_model_select_sorted_results.csv
++++ b/model_and_tree/mammoth_model_select_sorted_results.csv
+@@ -1,93 +1,93 @@
+ "Model","df","logLik","AIC","AICw","AICc","AICcw","BIC"
+-"HKY+G(4)+I",87,-26517.0450633851,53208.0901267702,0.198213642277159,53209.0006339951,0.200558393263324,53881.0668569876
+-"TPM2u+G(4)+I",88,-26516.3870546011,53208.7741092022,0.140801941744554,53209.7056030176,0.140980408133294,53889.4862041347
+
+tail -15 logs/model_select.log
+Result: 
+pubh6860 ±|snakemake-workflow ✗|→ tail -15 logs/model_select.log
+    GTR+G(4) 90 -26554.05 53288.09 53984.28
+  GTR+G(4)+I 91 -26515.31 53212.63 53916.55
+          Model df    logLik      AIC       AICw     AICc      AICcw      BIC
+16   HKY+G(4)+I 87 -26517.05 53208.09 0.19821363 53209.00 0.20055838 53881.07
+44 TPM2u+G(4)+I 88 -26516.39 53208.77 0.14080194 53209.71 0.14098040 53889.49
+52 TPM3u+G(4)+I 88 -26516.42 53208.83 0.13664558 53209.77 0.13681878 53889.55
+36 TPM1u+G(4)+I 88 -26516.62 53209.25 0.11101285 53210.18 0.11115355 53889.96
+24   TrN+G(4)+I 88 -26516.65 53209.31 0.10776840 53210.24 0.10790499 53890.02
+68  TIM2+G(4)+I 89 -26515.99 53209.97 0.07738172 53210.92 0.07666182 53898.42
+76  TIM3+G(4)+I 89 -26516.02 53210.05 0.07453922 53211.00 0.07384576 53898.49
+60  TIM1+G(4)+I 89 -26516.23 53210.47 0.06039922 53211.42 0.05983731 53898.91
+84   TVM+G(4)+I 90 -26515.72 53211.43 0.03722331 53212.41 0.03648330 53907.62
+92   GTR+G(4)+I 91 -26515.31 53212.63 0.02050573 53213.62 0.01988111 53916.55
+Best model by AIC: HKY+G(4)+I
+Best model by BIC: HKY+I
+
+tail -30 logs/tree.log
+Result:
+07:49:34 (mammoth-project) nelin@Nicole-ASUS mammoth_mitogenome_pubh6860 ±|snakemake-workflow ✗|→ tail -30 logs/tree.log
+3  3.1946064 0.03707487
+4  6.7319287 0.03707487
+5 16.1357539 0.03707487
+
+Rate matrix:
+         a        c        g        t
+a  0.00000  1.00000 51.92908  1.00000
+c  1.00000  0.00000  1.00000 51.92908
+g 51.92908  1.00000  0.00000  1.00000
+t  1.00000 51.92908  1.00000  0.00000
+
+Base frequencies:
+        a         c         g         t
+0.3297731 0.2519268 0.1311054 0.2871946
+logLik: -26516.91
+Gamma shape: 0.9901088
+Proportion invariant sites: 0.8517005
+null device
+          1
+
+==== Root-to-tip distances (largest first) ====
+       Lab_ID root_to_tip_distance Median_CalBP                    Group
+37   Oimyakon          0.014933050        44828           Pre-bottleneck
+18 GilbertM21          0.014640047         n.a. Pre-bottleneck (undated)
+20 GilbertM25          0.014276451        60495           Pre-bottleneck
+17 GilbertM20          0.012993592         n.a. Pre-bottleneck (undated)
+42     Rogaev          0.003051367         n.a. Pre-bottleneck (undated)
+40       P011          0.002033285        11972           Pre-bottleneck
+21 GilbertM26          0.001789838        28769           Pre-bottleneck
+2       Ber28          0.001723102        14011           Pre-bottleneck
+```
+- **Exact output (verbatim):** 
+Before anything else, I need to correct something I told you earlier. When your first re-run of model selection came back with a blank diff (Step 7b), I said the model table matched your original exactly. That was wrong. `git diff` hides files that have been staged, and I think that's why it printed nothing. Your pasted output shows the numbers did change, so I should have had you compare against `main`, not just the working copy. The comparison below is the real one.
+
+### What the evidence shows
+| | Original (Windows R 4.6.1) | This run (conda R 4.5.3) |
+|---|---|---|
+| HKY+G(4)+I log-likelihood | −26518.63 | −26517.05 |
+| HKY+G(4)+I AIC | 53211.25 | 53208.09 |
+| AIC weight | 0.198 | 0.198 |
+| Winner by AIC / by BIC | HKY+G(4)+I / HKY+I | HKY+G(4)+I / HKY+I |
+
+- **The model table differs, but the conclusions don't.** Every model with both gamma and invariant sites shifted by the same amount (about 3.2 AIC units), so the ranking and the AIC weights are essentially unchanged. The cause is probably a small difference in how this R/phangorn version fits the starting model. That's my best guess, not something I've proven. Your new numbers have the *higher* likelihood, so they aren't worse.
+- **The final tree fit is the same as your corrected earlier run.** `tree.log` shows logLik −26516.91, gamma shape 0.9901088, invariant sites 0.8517005, and identical base frequencies. After optimization, the model lands in the same place either way.
+- **The pipeline run vs your earlier manual run differ only in rounding noise.** The AIC weight is 0.19821363 vs 0.19821364, and root-to-tip distances differ around the 9th decimal. That's why git shows 92 changed rows without any visible change. Repeated runs aren't bit-identical for these fitting steps, so for them we compare with a tolerance, not a checksum.
+- **The speed was real.** `tree.log` and `model_select.log` both show complete fits, so 39 seconds on this machine is just fast.
+
+### What this means for the paper
+Report the numbers from the final pipeline run (the committed repo): HKY+G(4)+I, logLik −26517.05, AIC 53208.09, AICc 53209.00, and HKY+I as the BIC winner. I'll need the exact HKY+I row:
+
+```bash
+grep '"HKY+I"' model_and_tree/mammoth_model_select_sorted_results.csv
+```
+
+The diversity and permutation numbers don't depend on this step and haven't changed.
+
+### Checks to run
+**1. A comparison with no blank-screen ambiguity.** `--no-pager` prints straight to the terminal, and the last line proves the command finished:
+
+```bash
+git --no-pager diff --ignore-cr-at-eol --stat main -- diversity_stats/*.csv model_and_tree/*.csv; echo "--- end of diff ---"
+```
+
+I expect only the model-selection CSV to be listed. If the diversity, permutation or subsample CSVs show up, tell me, because that would be a real problem.
+
+**2. Is the tree topology unchanged from what you committed?**
+```bash
+git show HEAD:model_and_tree/mammoth_tree.nwk > /tmp/committed_tree.nwk
+Rscript --no-init-file -e 'suppressMessages(library(phangorn)); cat("RF distance:", RF.dist(read.tree("/tmp/committed_tree.nwk"), read.tree("model_and_tree/mammoth_tree.nwk")), "\n")'
+```
+
+`0` means the same topology, with only branch lengths wiggling at the 9th decimal.
+
+Paste both results and the `HKY+I` line. If all is well, commit the regenerated files as the pipeline's baseline:
+
+```bash
+git add model_and_tree/ diversity_stats/ notes.md
+git commit -m "Regenerate all outputs via Snakemake (conda R 4.5.3); model table shifted by constant offset, conclusions unchanged"
+```
+
+Then we finish with the duplicate-file cleanup, the README section, and the pipeline diagram.
+- **Verification:** I ran each and every code as directed, retyped every script or file sent, understood the changes and the process, and ensured the final output was correct and logical. Claude said identical; the main diff showed a constant AIC offset; conclusions unchanged.
