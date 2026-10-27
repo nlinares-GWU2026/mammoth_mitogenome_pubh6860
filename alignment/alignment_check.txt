@@ -1,0 +1,3 @@
+Number of sequences: 42 
+Length of first sequence: 16905 
+All sequences equal length: TRUE 
